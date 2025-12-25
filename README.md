@@ -22,7 +22,7 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 **Login as root** to run those commands.
 
 ```bash
-wget https://github.com/codetot-web/runcloud-bash-scripts/blob/main/install-ioncube.sh
+wget https://raw.githubusercontent.com/codetot-web/runcloud-bash-scripts/refs/heads/main/install-ioncube.sh
 chmod +x install-ioncube.sh
 ./install-ioncube.sh
 ```
@@ -61,7 +61,7 @@ Login as `runcloud` or any system user (not require `root`)
 
 ```bash
 cd /home/runcloud/
-wget https://github.com/codetot-web/runcloud-bash-scripts/blob/main/wp-migration.sh
+wget https://raw.githubusercontent.com/codetot-web/runcloud-bash-scripts/refs/heads/main/wp-migration.sh
 chmod +x wp-migration.sh
 ```
 ### Sample 1: Same application, only different server
