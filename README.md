@@ -11,7 +11,8 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 - Ubuntu 20, 22 or 24 version
 
 ## Changelog
-- [x] Install ioncube for all PHP versions
+- [x] Install ioncube for all PHP versions - OpenLitespeed
+- [x] Install ioncube for all PHP versions - nginx
 
 ## Install Ioncube
 
