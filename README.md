@@ -16,6 +16,9 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 - [x] Install ioncube for all PHP versions - OpenLitespeed
 - [x] Install ioncube for all PHP versions - nginx
 - [x] Migration script for WordPress (server to server)
+- [ ] Change SSH port
+- [ ] Automatic Tweak my.cnf
+- [ ] Batch update WP Site (using wp-cli)
 
 ## Install Ioncube
 
