@@ -18,7 +18,7 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 ## Install Ioncube
 
 ```bash
-wget github.com/codetot-web/runcloud-bash-scripts/blob/main/install-ioncube.sh
+wget https://github.com/codetot-web/runcloud-bash-scripts/blob/main/install-ioncube.sh
 chmod +x install-ioncube.sh
 ./install-ioncube.sh
 ```
@@ -49,4 +49,25 @@ the ionCube PHP Loader
 ionCube Loader
 the ionCube PHP Loader
 ✅ ionCube installation completed for all detected PHP versions.
+```
+
+## Migration WP Site
+
+Login as `runcloud` or any system user (not require `root`)
+
+```bash
+cd /home/runcloud/
+wget https://github.com/codetot-web/runcloud-bash-scripts/blob/main/wp-migration.sh
+chmod +x wp-migration.sh
+```
+### Sample 1: Same application, only different server
+
+```bash
+./wp-migration.sh runcloud@sample.codetot.com:22 codetot-app
+```
+
+### Sample 2: Different appname
+
+```bash
+./wp-migration.sh ecohome@sample.codetot.com:22 codetot-app codetot-app-new
 ```
