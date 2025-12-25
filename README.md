@@ -4,10 +4,12 @@ Author: @khoipro, alongs with Copilot.
 
 The collection of helpful bash scripts to help you manage servers better. Written by me with Copilot suggestions. Tested.
 
-**Login as root** to run those commands.
+## Features
+- [Install ioncube]([url](https://github.com/codetot-web/runcloud-bash-scripts/blob/main/README.md#install-ioncube))
+- [Migration WP Site]([url](https://github.com/codetot-web/runcloud-bash-scripts/blob/main/README.md#migration-wp-site))
 
 ## Requirements
-- OpenLitespeed
+- OpenLitespeed/Nginx
 - Ubuntu 20, 22 or 24 version
 
 ## Changelog
@@ -16,6 +18,8 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 - [x] Migration script for WordPress (server to server)
 
 ## Install Ioncube
+
+**Login as root** to run those commands.
 
 ```bash
 wget https://github.com/codetot-web/runcloud-bash-scripts/blob/main/install-ioncube.sh
