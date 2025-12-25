@@ -13,6 +13,7 @@ The collection of helpful bash scripts to help you manage servers better. Writte
 ## Changelog
 - [x] Install ioncube for all PHP versions - OpenLitespeed
 - [x] Install ioncube for all PHP versions - nginx
+- [x] Migration script for WordPress (server to server)
 
 ## Install Ioncube
 
