@@ -1,56 +1,47 @@
 #!/bin/bash
-
+# The Bash script to help you migration the Runcloud application from one to another 
+# - copy wp-config.php
+# - copy .htaccess
+# - copy .htninja
+# - copy wp-content/uploads
+# 
+# Notice: It does not copy a whole project since you can make backup and restore to another server
+# Our team setup Git for every project so we don't need to copy a full project
+# 
 # === Usage ===
-# ./wp-migration.sh user@host:port src_appname [dest_appname]
+# ./wp-migration.sh user@host:port sampleapp [destapp]
 #
-# Examples:
-# - Same app name on both ends:
-#   ./wp-migration.sh runcloud@sample.codetot.com:2018 myapp
-#
-# - Different app name on destination:
-#   ./wp-migration.sh ecohome@sample.codetot.com:2018 srcapp destapp
+# Example:
+# Same app: ./wp-migration.sh runcloud@sample.server.com:22 sampleapp
+# Different app: ./wp-migration.sh ecohome@sample.server.com:22 sampleapp destapp
 
 set -euo pipefail
 
-# === Parameters ===
 if [ $# -lt 2 ] || [ $# -gt 3 ]; then
   echo "Usage: $0 user@host:port src_appname [dest_appname]"
   exit 1
 fi
 
-DEST_RAW="$1"           # e.g. ecohome@sg6.codetot.org:2018
-SRC_APPNAME="$2"        # source app name
-DEST_APPNAME="${3:-$SRC_APPNAME}"   # default to same as source
+DEST_RAW="$1"
+SRC_APPNAME="$2"
+DEST_APPNAME="${3:-$SRC_APPNAME}"
 
-# Parse user, host, port
 USERHOST="${DEST_RAW%:*}"             # strip :port
 DEST_PORT="${DEST_RAW##*:}"           # port after last :
 DEST_USER="${USERHOST%@*}"            # before @
 DEST_HOST="${USERHOST#*@}"            # after @
 
-# Paths
 SRC_PATH="/home/$USER/webapps/$SRC_APPNAME"
 DEST_PATH="/home/$DEST_USER/webapps/$DEST_APPNAME"
 
 DATE="$(date +"%Y%m%d_%H%M%S")"
 DB_FILE="db_export_${SRC_APPNAME}_${DATE}.sql"
-LOG_FILE="/home/$USER/wp_uploads_${DEST_APPNAME}_${DATE}.log"
 
-# === Pre-flight checks ===
 echo "Source path: $SRC_PATH"
 echo "Destination: $DEST_USER@$DEST_HOST:$DEST_PATH (port $DEST_PORT)"
-if [ ! -d "$SRC_PATH" ]; then
-  echo "Error: Source path not found: $SRC_PATH"
-  exit 1
-fi
-if ! command -v wp >/dev/null 2>&1; then
-  echo "Error: 'wp' CLI not found in PATH. Install WP-CLI or adjust PATH."
-  exit 1
-fi
 
 # === Export Database ===
-echo "Exporting database from $SRC_APPNAME..."
-cd "$SRC_PATH"
+cd "$SRC_PATH" || exit
 wp db export "$DB_FILE"
 
 # === Sync core config files ===
@@ -70,27 +61,16 @@ if [ -f "$SRC_PATH/.htninja" ]; then
     "$DEST_USER@$DEST_HOST:$DEST_PATH/"
 fi
 
-# === Sync uploads in background (nohup) ===
-echo "Starting uploads sync in background with nohup..."
-nohup rsync -zaP -e "ssh -p $DEST_PORT" \
-  "$SRC_PATH/wp-content/uploads/" \
-  "$DEST_USER@$DEST_HOST:$DEST_PATH/wp-content/uploads/" \
-  > "$LOG_FILE" 2>&1 &
-
-UPLOADS_PID=$!
-echo "Uploads sync started (PID: $UPLOADS_PID)."
-echo "Log file: $LOG_FILE"
-echo "Monitor with: tail -f \"$LOG_FILE\""
+# === Sync uploads in foreground ===
+echo "Syncing uploads folder (this may take a while)..."
+rsync -zaP -e "ssh -p $DEST_PORT" "$SRC_PATH/wp-content/uploads/" \
+  "$DEST_USER@$DEST_HOST:$DEST_PATH/wp-content/uploads/"
 
 # === Copy DB export ===
-echo "Copying DB export to destination..."
+echo "Copying DB export..."
 rsync -zaP -e "ssh -p $DEST_PORT" "$SRC_PATH/$DB_FILE" \
   "$DEST_USER@$DEST_HOST:$DEST_PATH/"
 
-# === Cleanup local DB export ===
 rm -f "$SRC_PATH/$DB_FILE"
 
-echo "✅ Migration kicked off."
-echo "- Configs synced."
-echo "- Database exported and transferred."
-echo "- Uploads are syncing in background (see log above)."
+echo "✅ Migration completed. Uploads finished in foreground."
