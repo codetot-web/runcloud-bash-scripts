@@ -1,10 +1,11 @@
 #!/bin/bash
 #
 # ============================================================
-# Node.js Update Script (RunCloud Guide Inspired)
+# Node.js Update Script (RunCloud Guide)
 # ============================================================
 # Usage:
-#   1. Save this file as update-node.sh
+#   1. Download a script
+#        wget https://github.com/codetot-web/runcloud-bash-scripts/raw/refs/heads/main/update-nodejs.sh
 #   2. Make it executable:
 #        chmod +x update-node.sh
 #   3. Run the script:
