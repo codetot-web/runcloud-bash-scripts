@@ -5,14 +5,19 @@
 # Default base path
 BASE_PATH="/home/runcloud/webapps"
 
+# Automatically add --allow-root if we are running as root
+if [ "$EUID" -eq 0 ]; then
+    ROOT_FLAG="--allow-root"
+else
+    ROOT_FLAG=""
+fi
+
 # Parse arguments
 for i in "$@"; do
   case $i in
     --site=*)
       SITE_NAME="${i#*=}"
       shift
-      ;;
-    *)
       ;;
   esac
 done
