@@ -1,8 +1,6 @@
 # RunCloud - Bash scripts
 
-Author: @khoipro, alongs with Copilot.
-
-The collection of helpful bash scripts to help you manage servers better. Written by me with Copilot suggestions. Tested.
+Author: [@khoipro](https://github.com/khoipro), @copilot
 
 ## Features
 - [x] Install ioncube for all PHP versions
