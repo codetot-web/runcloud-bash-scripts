@@ -3,7 +3,7 @@
 # WordPress Security Audit Script
 # Usage: wp-security-audit.sh [--folder=/path/to/webapp]
 # Logs suspicious findings per webapp folder
-# Does NOT delete anything — audit only
+# Stops if required packages are missing
 
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
@@ -23,6 +23,17 @@ done
 # Ensure log directory exists
 mkdir -p /var/log/webapps
 
+# --- Check required packages ---
+REQUIRED_PKGS=("clamscan" "rkhunter" "chkrootkit")
+
+for pkg in "${REQUIRED_PKGS[@]}"; do
+  if ! command -v $pkg >/dev/null 2>&1; then
+    echo "ERROR: Required package '$pkg' is not installed. Please run wp-security-audit-installer.sh first."
+    exit 1
+  fi
+done
+
+# --- Run audit ---
 for SCANPATH in $SCANPATHS; do
   APPNAME=$(basename "$SCANPATH")
   LOGFILE="/var/log/webapps/${APPNAME}.log"
@@ -38,7 +49,7 @@ for SCANPATH in $SCANPATHS; do
     --exclude-dir="^$SCANPATH/wp-content/cache" \
     >> $LOGFILE 2>&1
 
-  # --- Rootkit checks (system-wide, appended to each log) ---
+  # --- Rootkit checks ---
   echo "[Rkhunter]" >> $LOGFILE
   rkhunter --check --sk >> $LOGFILE 2>&1
 
