@@ -1,7 +1,8 @@
 #!/bin/bash
+# change_ssh_port.sh
 # Usage:
-#   sudo ./change-ssh-port.sh <new_port>
-#   sudo ./change-ssh-port.sh restore
+#   sudo ./change_ssh_port.sh <new_port>
+#   sudo ./change_ssh_port.sh restore
 
 SSHD_CONFIG="/etc/ssh/sshd_config"
 JAIL_LOCAL="/etc/fail2ban/jail.local"
@@ -84,14 +85,29 @@ if [ -f "$JAIL_LOCAL" ]; then
 \[sshd\]
 
 " $JAIL_LOCAL; then
-    sed -i "/^
+    # Replace port line if it exists
+    if grep -A5 "^
+
+\[sshd\]
+
+" $JAIL_LOCAL | grep -q "^port"; then
+      sed -i "/^
 
 \[sshd\]
 
 /,/^
 
-\[/ s/^port.*/port = $NEW_PORT/" $JAIL_LOCAL
+\[/{s/^port.*/port = $NEW_PORT/}" $JAIL_LOCAL
+    else
+      # Add port line just after [sshd]
+      sed -i "/^
+
+\[sshd\]
+
+/a port = $NEW_PORT" $JAIL_LOCAL
+    fi
   else
+    # Add sshd section if missing
     cat <<EOF >> $JAIL_LOCAL
 
 [sshd]
