@@ -59,22 +59,23 @@ for SCANPATH in $SCANPATHS; do
   # --- Uploads folder audit: flag non-media files ---
   echo "[Uploads Folder Audit]" >> $LOGFILE
   find "$SCANPATH/wp-content/uploads" \
+    -path "*/cache" -prune -o \
     -type f ! -regex '.*\.\(jpg\|jpeg\|png\|gif\|svg\|pdf\|docx\|xlsx\|zip\|mp4\|mp3\)$' \
-    >> $LOGFILE 2>&1
+    -print >> $LOGFILE 2>&1
 
   # --- Plugin audit: suspicious patterns ---
   echo "[Plugin Audit - base64]" >> $LOGFILE
-  grep -R --include="*.php" "base64" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.php" --exclude-dir="cache" "base64" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
 
   echo "[Plugin Audit - redirects]" >> $LOGFILE
-  grep -R --include="*.php" "wp_redirect" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
-  grep -R --include="*.php" "header(" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
-  grep -R --include="*.js" "window.location" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.php" --exclude-dir="cache" "wp_redirect" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.php" --exclude-dir="cache" "header(" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.js" --exclude-dir="cache" "window.location" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
 
   echo "[Plugin Audit - mobile conditions]" >> $LOGFILE
-  grep -R --include="*.php" "wp_is_mobile" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
-  grep -R --include="*.php" "HTTP_USER_AGENT" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
-  grep -R --include="*.js" "navigator.userAgent" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.php" --exclude-dir="cache" "wp_is_mobile" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.php" --exclude-dir="cache" "HTTP_USER_AGENT" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
+  grep -R --include="*.js" --exclude-dir="cache" "navigator.userAgent" "$SCANPATH/wp-content/plugins/" >> $LOGFILE 2>&1
 
   echo "=== End of Audit for $APPNAME ===" >> $LOGFILE
 done
