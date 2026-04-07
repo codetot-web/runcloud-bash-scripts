@@ -14,6 +14,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [ ] Batch update WP Site (using wp-cli)
 - [x] WP Security audit installer and WP Security Audit
 - [x] Server metrics collector with webhook reporting
+- [x] Self-update (auto-pull latest from GitHub)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -270,6 +271,20 @@ When `WEBHOOK_SECRET` is set, the script sends two headers:
 - `X-Webhook-Timestamp` — Unix timestamp of the request
 
 Verify on the receiving end with timing-safe comparison (`hash_equals` in PHP, `hmac.compare_digest` in Python).
+
+### self-update.sh
+
+Auto-update the repository by pulling the latest changes from GitHub. Skips if already up to date. Automatically `chmod +x` all scripts after update.
+
+```bash
+./self-update.sh
+```
+
+**Cron job example (daily at 3:30 AM):**
+
+```bash
+30 3 * * * /root/runcloud-bash-scripts/self-update.sh >> /var/log/runcloud-bash-scripts-update.log 2>&1
+```
 
 ### change-ssh-port.sh
 
