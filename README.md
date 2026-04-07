@@ -13,6 +13,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Automatic Tweak my.cnf
 - [ ] Batch update WP Site (using wp-cli)
 - [x] WP Security audit installer and WP Security Audit
+- [x] Server metrics collector with webhook reporting
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -211,6 +212,64 @@ Auto-tune MariaDB/MySQL settings based on server RAM and CPU. Optimized for Word
 ```bash
 ./tweak-mycnf.sh --restore
 ```
+
+### server-metrics.sh
+
+Collect server metrics (CPU, RAM, disk, load, uptime) and discover all web applications under `/home/*/webapps/`. Detects WordPress sites and checks for available updates (core, plugins, themes). Sends the JSON payload to any webhook endpoint with optional HMAC-SHA256 signing.
+
+**What it collects:**
+- CPU usage, load averages (1m/5m/15m)
+- RAM total/used/percent
+- Disk total/used/percent (root partition)
+- Uptime in seconds
+- Per-webapp: username, app name, disk usage in MB
+- WordPress: version, site URL, available core/plugin/theme updates
+
+**Print metrics to stdout (no HTTP request):**
+
+```bash
+./server-metrics.sh --print
+```
+
+**Send to a webhook endpoint:**
+
+```bash
+WEBHOOK_URL=https://example.com/api/webhooks/server-metrics ./server-metrics.sh
+```
+
+**Send with HMAC-SHA256 authentication:**
+
+```bash
+WEBHOOK_URL=https://example.com/api/webhooks/server-metrics \
+WEBHOOK_SECRET=your-secret \
+./server-metrics.sh
+```
+
+**Override hostname:**
+
+```bash
+WEBHOOK_URL=https://example.com/webhook \
+HOSTNAME_OVERRIDE=my-server-01 \
+./server-metrics.sh
+```
+
+**Cron job examples (run as `root`):**
+
+```bash
+# Every 5 minutes — send metrics to webhook
+*/5 * * * * WEBHOOK_URL=https://example.com/webhook WEBHOOK_SECRET=your-secret /root/runcloud-bash-scripts/server-metrics.sh >> /var/log/server-metrics.log 2>&1
+
+# Every hour — save metrics locally
+0 * * * * /root/runcloud-bash-scripts/server-metrics.sh --print >> /var/log/server-metrics.json
+```
+
+**HMAC-SHA256 Signature:**
+
+When `WEBHOOK_SECRET` is set, the script sends two headers:
+- `X-Webhook-Signature` — HMAC-SHA256 of `{timestamp}.{payload}`
+- `X-Webhook-Timestamp` — Unix timestamp of the request
+
+Verify on the receiving end with timing-safe comparison (`hash_equals` in PHP, `hmac.compare_digest` in Python).
 
 ### change-ssh-port.sh
 
