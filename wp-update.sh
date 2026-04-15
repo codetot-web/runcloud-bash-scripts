@@ -90,7 +90,18 @@ if [ -z "$WP_CLI" ]; then
     exit 1
 fi
 
-WP="$WP_CLI --path=$SITE_PATH --allow-root"
+# Detect site owner — run wp-cli as the correct user, not root
+SITE_OWNER=$(stat -c '%U' "$SITE_PATH" 2>/dev/null || stat -f '%Su' "$SITE_PATH" 2>/dev/null || echo "runcloud")
+if [ "$SITE_OWNER" = "root" ]; then
+    SITE_OWNER="runcloud"
+fi
+info "Site owner: $SITE_OWNER"
+
+if [ "$(whoami)" = "$SITE_OWNER" ]; then
+    WP="$WP_CLI --path=$SITE_PATH"
+else
+    WP="sudo -u $SITE_OWNER $WP_CLI --path=$SITE_PATH"
+fi
 
 # --- Git check ---
 if [ "$NO_GIT" = false ] && [ -d "$SITE_PATH/.git" ]; then
@@ -229,9 +240,10 @@ git_commit() {
     if [ "$NO_GIT" = false ] && [ -d "$SITE_PATH/.git" ] && [ "$DRY_RUN" = false ]; then
         cd "$SITE_PATH"
         if ! git diff --quiet 2>/dev/null; then
-            git add -A
-            git commit -m "chore: wp-update $ACTION $(date +%Y-%m-%d)" --quiet 2>/dev/null || true
-            success "Changes committed to git"
+            sudo -u "$SITE_OWNER" git add -A 2>/dev/null || git add -A
+            sudo -u "$SITE_OWNER" git commit -m "chore: wp-update $ACTION $(date +%Y-%m-%d)" --quiet 2>/dev/null || \
+                git commit -m "chore: wp-update $ACTION $(date +%Y-%m-%d)" --quiet 2>/dev/null || true
+            success "Changes committed to git (as $SITE_OWNER)"
         else
             info "No changes to commit"
         fi
