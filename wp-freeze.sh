@@ -165,19 +165,31 @@ inject_wpconfig_constants() {
     if [ "$DRY_RUN" = true ]; then
         dry "Would inject CODE FREEZE constants into $wpconfig"
     else
-        # Inject before the "That's all" line, or append before closing PHP if not found
-        if grep -q "That's all, stop editing" "$wpconfig"; then
-            sed -i "/That's all, stop editing/i\\
-${WPCONFIG_MARKER_START}\\
-define('DISALLOW_FILE_EDIT', true);\\
-define('DISALLOW_FILE_MODS', true);\\
-define('AUTOMATIC_UPDATER_DISABLED', true);\\
-${WPCONFIG_MARKER_END}\\
-" "$wpconfig"
-        else
-            echo "" >> "$wpconfig"
-            echo "$block" >> "$wpconfig"
-        fi
+        # Use Python3 for reliable multiline insertion (avoids GNU sed quirks)
+        python3 - "$wpconfig" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+with open(path, 'r') as f:
+    content = f.read()
+
+block = (
+    "\n// === CODE FREEZE — managed by wp-freeze.sh ===\n"
+    "define('DISALLOW_FILE_EDIT', true);\n"
+    "define('DISALLOW_FILE_MODS', true);\n"
+    "define('AUTOMATIC_UPDATER_DISABLED', true);\n"
+    "// === END CODE FREEZE ===\n"
+)
+
+marker = "That's all, stop editing"
+if marker in content:
+    content = content.replace(marker, block + marker, 1)
+else:
+    content = content.rstrip() + block
+
+with open(path, 'w') as f:
+    f.write(content)
+PYEOF
         success "Injected CODE FREEZE constants into wp-config.php"
     fi
 }
