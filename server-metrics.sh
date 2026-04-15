@@ -45,6 +45,7 @@ IP_ADDRESS=$(ip -4 addr show scope global 2>/dev/null | grep -oP 'inet \K[\d.]+'
 
 # CPU usage (1-second sample via top)
 CPU_PERCENT=$(top -bn2 -d1 2>/dev/null | grep '%Cpu' | tail -1 | awk '{print 100 - $8}' || echo "")
+CPU_CORES=$(nproc 2>/dev/null || grep -c '^processor' /proc/cpuinfo 2>/dev/null || echo "")
 
 # Load averages
 read -r LOAD_1M LOAD_5M LOAD_15M _ < /proc/loadavg 2>/dev/null || { LOAD_1M=""; LOAD_5M=""; LOAD_15M=""; }
@@ -170,7 +171,7 @@ json_field() {
 }
 
 PAYLOAD=$(cat <<EOF
-{$(json_field hostname "$SERVER_HOSTNAME"),$(json_field ip_address "$IP_ADDRESS"),$(json_field cpu_percent "$CPU_PERCENT" number),$(json_field load_1m "$LOAD_1M" number),$(json_field load_5m "$LOAD_5M" number),$(json_field load_15m "$LOAD_15M" number),$(json_field ram_total_mb "$RAM_TOTAL_MB" number),$(json_field ram_used_mb "$RAM_USED_MB" number),$(json_field ram_percent "$RAM_PERCENT" number),$(json_field disk_total_mb "$DISK_TOTAL_MB" number),$(json_field disk_used_mb "$DISK_USED_MB" number),$(json_field disk_percent "$DISK_PERCENT" number),$(json_field uptime_seconds "$UPTIME_SECONDS" number),$(json_field reported_at "$REPORTED_AT"),"web_apps":$WEB_APPS_JSON}
+{$(json_field hostname "$SERVER_HOSTNAME"),$(json_field ip_address "$IP_ADDRESS"),$(json_field cpu_percent "$CPU_PERCENT" number),$(json_field cpu_cores "$CPU_CORES" number),$(json_field load_1m "$LOAD_1M" number),$(json_field load_5m "$LOAD_5M" number),$(json_field load_15m "$LOAD_15M" number),$(json_field ram_total_mb "$RAM_TOTAL_MB" number),$(json_field ram_used_mb "$RAM_USED_MB" number),$(json_field ram_percent "$RAM_PERCENT" number),$(json_field disk_total_mb "$DISK_TOTAL_MB" number),$(json_field disk_used_mb "$DISK_USED_MB" number),$(json_field disk_percent "$DISK_PERCENT" number),$(json_field uptime_seconds "$UPTIME_SECONDS" number),$(json_field reported_at "$REPORTED_AT"),"web_apps":$WEB_APPS_JSON}
 EOF
 )
 
