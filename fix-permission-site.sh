@@ -42,19 +42,13 @@ fix_permissions() {
         echo "  Ownership OK — skipping chown"
     fi
 
-    # 2. Fix directory permissions — exclude uploads/
-    sudo find "$dir" \
-        -not \( -path "$uploads_dir" -prune \) \
-        -not \( -path "$uploads_dir/*" -prune \) \
-        -type d \
-        -exec chmod 755 {} +
+    # 2. Fix directory permissions — exclude uploads/ (correct prune syntax)
+    sudo find "$dir" -path "$uploads_dir" -prune \
+        -o -type d -exec chmod 755 {} +
 
-    # 3. Fix file permissions — exclude uploads/
-    sudo find "$dir" \
-        -not \( -path "$uploads_dir" -prune \) \
-        -not \( -path "$uploads_dir/*" -prune \) \
-        -type f \
-        -exec chmod 644 {} +
+    # 3. Fix file permissions — exclude uploads/ (correct prune syntax)
+    sudo find "$dir" -path "$uploads_dir" -prune \
+        -o -type f -exec chmod 644 {} +
 
     # 4. Ensure uploads/ itself is accessible (755) but don't recurse
     if [ -d "$uploads_dir" ]; then
