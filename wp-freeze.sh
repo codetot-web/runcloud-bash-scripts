@@ -165,31 +165,27 @@ inject_wpconfig_constants() {
     if [ "$DRY_RUN" = true ]; then
         dry "Would inject CODE FREEZE constants into $wpconfig"
     else
-        # Use Python3 for reliable multiline insertion (avoids GNU sed quirks)
-        python3 - "$wpconfig" <<'PYEOF'
+        # Use Python3 for reliable multiline insertion (avoids GNU sed quirks).
+        # Single-quoted bash string prevents variable expansion; \x27 = apostrophe,
+        # \u2014 = em dash — both interpreted by Python 3 string literals.
+        python3 -c '
 import sys
-
 path = sys.argv[1]
-with open(path, 'r') as f:
-    content = f.read()
-
+content = open(path).read()
 block = (
-    "\n// === CODE FREEZE — managed by wp-freeze.sh ===\n"
-    "define('DISALLOW_FILE_EDIT', true);\n"
-    "define('DISALLOW_FILE_MODS', true);\n"
-    "define('AUTOMATIC_UPDATER_DISABLED', true);\n"
+    "\n// === CODE FREEZE \u2014 managed by wp-freeze.sh ===\n"
+    "define(\"DISALLOW_FILE_EDIT\", true);\n"
+    "define(\"DISALLOW_FILE_MODS\", true);\n"
+    "define(\"AUTOMATIC_UPDATER_DISABLED\", true);\n"
     "// === END CODE FREEZE ===\n"
 )
-
-marker = "That's all, stop editing"
+marker = "That\x27s all, stop editing"
 if marker in content:
     content = content.replace(marker, block + marker, 1)
 else:
     content = content.rstrip() + block
-
-with open(path, 'w') as f:
-    f.write(content)
-PYEOF
+open(path, "w").write(content)
+' "$wpconfig"
         success "Injected CODE FREEZE constants into wp-config.php"
     fi
 }
