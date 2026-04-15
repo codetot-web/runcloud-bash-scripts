@@ -33,8 +33,14 @@ fix_permissions() {
 
     echo "Processing $dir ..."
 
-    # 1. Fix ownership everywhere (including uploads)
-    sudo chown -R runcloud:runcloud "$dir" || echo "Warning: chown failed for $dir"
+    # 1. Fix ownership — only if any file is not owned by runcloud (skip if already correct)
+    wrong_owner=$(sudo find "$dir" -not -user runcloud -not -group runcloud 2>/dev/null | head -1)
+    if [ -n "$wrong_owner" ]; then
+        echo "  Fixing ownership..."
+        sudo chown -R runcloud:runcloud "$dir" || echo "Warning: chown failed for $dir"
+    else
+        echo "  Ownership OK — skipping chown"
+    fi
 
     # 2. Fix directory permissions — exclude uploads/
     sudo find "$dir" \
