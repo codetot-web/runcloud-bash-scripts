@@ -149,12 +149,16 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 fi
             fi
 
-            # Git remote detection (fast — reads .git/config only)
+            # Git detection (fast — reads .git/config only, no network)
             git_field=""
             if [ -d "$app_path/.git" ]; then
                 git_url=$(git -C "$app_path" remote get-url origin 2>/dev/null || echo "")
                 if [ -n "$git_url" ]; then
                     git_field=",\"git_remote\":\"$git_url\""
+                fi
+                # Check for uncommitted changes
+                if ! git -C "$app_path" diff --quiet 2>/dev/null || ! git -C "$app_path" diff --cached --quiet 2>/dev/null; then
+                    git_field="$git_field,\"git_dirty\":true"
                 fi
             fi
 
