@@ -158,7 +158,13 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 fi
             fi
 
-            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields$git_field}")
+            # Freeze detection — check for code-freeze mu-plugin
+            freeze_field=""
+            if [ -f "$app_path/wp-content/mu-plugins/code-freeze.php" ]; then
+                freeze_field=",\"is_frozen\":true"
+            fi
+
+            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields$git_field$freeze_field}")
         done
     done
     if [ ${#WEB_APPS_ENTRIES[@]} -gt 0 ]; then
