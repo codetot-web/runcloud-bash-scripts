@@ -6,6 +6,9 @@
 #   ./fix-permission-site.sh --site=APPNAME    # fix one site
 #   ./fix-permission-site.sh                   # fix all sites
 #
+# Excluded from chmod (permissions preserved, manual check required):
+#   - wp-content/uploads/   (user-uploaded media, may have varying permissions)
+#
 
 WEBROOT="/home/runcloud/webapps"
 TARGET_SITE=""
@@ -18,16 +21,41 @@ for i in "$@"; do
     esac
 done
 
-# fix_permissions: sets ownership to runcloud:runcloud,
-# directories to 755, files to 644.
+# fix_permissions: sets ownership to runcloud:runcloud everywhere,
+# then sets dirs to 755 and files to 644 — excluding wp-content/uploads/
+# which contains user-uploaded media and requires manual review.
+#
 # Uses `find -exec {} +` to batch paths per chmod call (fast),
-# instead of `find -exec {} \;` (one subprocess per file — very slow on large sites).
+# instead of `find -exec {} \;` (one subprocess per file — very slow).
 fix_permissions() {
     local dir=$1
+    local uploads_dir="$dir/wp-content/uploads"
+
     echo "Processing $dir ..."
+
+    # 1. Fix ownership everywhere (including uploads)
     sudo chown -R runcloud:runcloud "$dir" || echo "Warning: chown failed for $dir"
-    sudo find "$dir" -type d -exec chmod 755 {} +
-    sudo find "$dir" -type f -exec chmod 644 {} +
+
+    # 2. Fix directory permissions — exclude uploads/
+    sudo find "$dir" \
+        -not \( -path "$uploads_dir" -prune \) \
+        -not \( -path "$uploads_dir/*" -prune \) \
+        -type d \
+        -exec chmod 755 {} +
+
+    # 3. Fix file permissions — exclude uploads/
+    sudo find "$dir" \
+        -not \( -path "$uploads_dir" -prune \) \
+        -not \( -path "$uploads_dir/*" -prune \) \
+        -type f \
+        -exec chmod 644 {} +
+
+    # 4. Ensure uploads/ itself is accessible (755) but don't recurse
+    if [ -d "$uploads_dir" ]; then
+        sudo chmod 755 "$uploads_dir"
+        echo "  Note: $uploads_dir excluded from recursive chmod — check manually if needed"
+    fi
+
     echo "Done with $dir"
 }
 
