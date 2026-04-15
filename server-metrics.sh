@@ -23,9 +23,13 @@
 set -euo pipefail
 
 PRINT_ONLY=false
-if [[ "${1:-}" == "--print" ]]; then
-    PRINT_ONLY=true
-fi
+QUICK_MODE=false
+for arg in "$@"; do
+    case "$arg" in
+        --print) PRINT_ONLY=true ;;
+        --quick) QUICK_MODE=true; PRINT_ONLY=true ;;  # quick = system metrics only, no app scan
+    esac
+done
 
 if [ "$PRINT_ONLY" = false ] && [ -z "${WEBHOOK_URL:-}" ]; then
     echo "ERROR: WEBHOOK_URL is not set. Use --print to output metrics without sending." >&2
@@ -82,9 +86,10 @@ wp_timeout() {
 }
 
 # ── Discover web applications ──────────────────────────────────────────────
+# Skipped in --quick mode (system metrics only, no wp-cli)
 
 WEB_APPS_JSON="[]"
-if [ -d /home ]; then
+if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
     WEB_APPS_ENTRIES=()
     for user_dir in /home/*/; do
         [ -d "$user_dir" ] || continue
