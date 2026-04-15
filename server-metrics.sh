@@ -149,7 +149,16 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 fi
             fi
 
-            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields}")
+            # Git remote detection (fast — reads .git/config only)
+            git_field=""
+            if [ -d "$app_path/.git" ]; then
+                git_url=$(git -C "$app_path" remote get-url origin 2>/dev/null || echo "")
+                if [ -n "$git_url" ]; then
+                    git_field=",\"git_remote\":\"$git_url\""
+                fi
+            fi
+
+            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields$git_field}")
         done
     done
     if [ ${#WEB_APPS_ENTRIES[@]} -gt 0 ]; then
