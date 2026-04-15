@@ -106,10 +106,25 @@ fi
 # --- Git check ---
 if [ "$NO_GIT" = false ] && [ -d "$SITE_PATH/.git" ]; then
     cd "$SITE_PATH"
-    if ! git diff --quiet 2>/dev/null; then
-        error "Git repo has uncommitted changes. Commit or stash first."
-        error "  cd $SITE_PATH && git status"
-        exit 1
+    # Run git as site owner to avoid "dubious ownership" errors
+    GIT_CMD="sudo -u $SITE_OWNER git"
+    if ! $GIT_CMD diff --quiet 2>/dev/null || ! $GIT_CMD diff --cached --quiet 2>/dev/null; then
+        # Check if it's a real dirty state or just a git ownership error
+        status_output=$($GIT_CMD status --short 2>&1)
+        if echo "$status_output" | grep -q "dubious ownership"; then
+            warn "Git ownership mismatch — adding safe.directory"
+            git config --global --add safe.directory "$SITE_PATH" 2>/dev/null || true
+            # Retry as root with safe.directory
+            if ! git diff --quiet 2>/dev/null; then
+                error "Git repo has uncommitted changes. Commit or stash first."
+                error "  cd $SITE_PATH && git status"
+                exit 1
+            fi
+        else
+            error "Git repo has uncommitted changes. Commit or stash first."
+            error "  cd $SITE_PATH && git status"
+            exit 1
+        fi
     fi
     info "Git status: clean"
 fi
