@@ -15,6 +15,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] WP Security audit installer and WP Security Audit
 - [x] Server metrics collector with webhook reporting
 - [x] Self-update (auto-pull latest from GitHub)
+- [x] WordPress code freeze (lock filesystem + disable user management)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -284,6 +285,61 @@ Auto-update the repository by pulling the latest changes from GitHub. Skips if a
 
 ```bash
 30 3 * * * /root/runcloud-bash-scripts/self-update.sh >> /var/log/runcloud-bash-scripts-update.log 2>&1
+```
+
+### wp-freeze.sh
+
+Lock a WordPress site's filesystem and admin capabilities after launch. Prevents plugin/theme installs, file edits, and user management — while keeping post publishing and media uploads fully functional.
+
+**Two-layer freeze:**
+- **Filesystem:** sets core files to read-only (`444`/`555`), blocks PHP execution in uploads
+- **WordPress:** injects `DISALLOW_FILE_MODS`, `DISALLOW_FILE_EDIT`, `AUTOMATIC_UPDATER_DISABLED` into `wp-config.php`
+- **Capability:** drops a mu-plugin that removes all user management capabilities and hides the Users menu
+
+**Freeze a site:**
+
+```bash
+./wp-freeze.sh --site=myapp --action=freeze
+```
+
+**Unfreeze before a maintenance window:**
+
+```bash
+./wp-freeze.sh --site=myapp --action=unfreeze
+```
+
+**Check status:**
+
+```bash
+./wp-freeze.sh --site=myapp --action=status
+# or all sites:
+./wp-freeze.sh --action=status
+```
+
+**Preview changes without applying:**
+
+```bash
+./wp-freeze.sh --site=myapp --action=freeze --dry-run
+```
+
+**What admin can do after freeze:**
+
+| Action | Works? |
+|--------|--------|
+| Create / edit / publish posts | Yes |
+| Upload media | Yes |
+| Install or update plugins/themes | No |
+| Edit theme/plugin files in admin | No |
+| Create / edit / delete users | No |
+| WordPress auto-updates | No |
+
+**Maintenance window workflow:**
+```bash
+# 1. Unfreeze before updates
+./wp-freeze.sh --site=myapp --action=unfreeze
+# 2. Run updates (plugins, core, etc.)
+# 3. Re-freeze after updates
+./wp-freeze.sh --site=myapp --action=freeze
 ```
 
 ### change-ssh-port.sh
