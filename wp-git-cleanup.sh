@@ -195,36 +195,41 @@ classify_files() {
 }
 
 # --- Check if file matches gitignore-worthy patterns ---
+# Note: uses [[ ]] prefix checks for deep paths since case glob * doesn't match /
 is_gitignore_candidate() {
     local file="$1"
+
+    # Prefix-based checks (deep directory matches)
+    [[ "$file" == wp-content/nfwlog/* ]]             && return 0
+    [[ "$file" == wp-content/wflogs/* ]]             && return 0
+    [[ "$file" == wp-content/litespeed/* ]]          && return 0
+    [[ "$file" == wp-content/wpvividbackups/* ]]     && return 0
+    [[ "$file" == wp-content/wpvivid* ]]             && return 0
+    [[ "$file" == wp-content/updraft/* ]]            && return 0
+    [[ "$file" == wp-content/ai1wm-backups/* ]]      && return 0
+    [[ "$file" == wp-content/backup* ]]              && return 0
+    [[ "$file" == wp-content/et-cache/* ]]           && return 0
+    [[ "$file" == wp-content/cache/* ]]              && return 0
+    [[ "$file" == wp-content/fonts/* ]]              && return 0
+    [[ "$file" == wp-content/ladipage/* ]]           && return 0
+    [[ "$file" == wp-content/upgrade-temp-backup/* ]] && return 0
+    [[ "$file" == wp-content/logs/* ]]               && return 0
+    [[ "$file" == wp-content/sn-backups/* ]]         && return 0
+    [[ "$file" == .tmb/* ]]                          && return 0
+
+    # Exact and suffix matches (case is fine for these)
     case "$file" in
         .maintenance-flags|.maintenance-exclude) return 0 ;;
         litespeed.conf|.htninja) return 0 ;;
         *.bak) return 0 ;;
         error_log|debug.log|*.log) return 0 ;;
-        wp-content/nfwlog/*) return 0 ;;
-        wp-content/wflogs/*) return 0 ;;
-        wp-content/litespeed/*) return 0 ;;
         wp-content/.litespeed_conf.dat) return 0 ;;
-        wp-content/wpvividbackups/*) return 0 ;;
-        wp-content/updraft/*) return 0 ;;
-        wp-content/ai1wm-backups/*) return 0 ;;
-        wp-content/backup*) return 0 ;;
-        wp-content/et-cache/*) return 0 ;;
-        wp-content/cache/*) return 0 ;;
         wp-content/advanced-cache.php) return 0 ;;
         wp-content/object-cache.php) return 0 ;;
         wp-content/wp-cache-config.php) return 0 ;;
         wp-content/db.php) return 0 ;;
-        wp-content/fonts/*) return 0 ;;
-        wp-content/ladipage/*) return 0 ;;
-        wp-content/wpvivid*) return 0 ;;
-        wp-content/upgrade-temp-backup/*) return 0 ;;
-        wp-content/logs/*) return 0 ;;
-        wp-content/sn-backups/*) return 0 ;;
         *.disabled) return 0 ;;
         *.wfbkp) return 0 ;;
-        .tmb/*) return 0 ;;
         *) return 1 ;;
     esac
 }
