@@ -12,7 +12,8 @@
 #   ./wp-vuln-check.sh --site=APPNAME --themes-only    # skip plugins
 #
 # Options:
-#   --site=NAME       Required. Web app name under /home/runcloud/webapps/
+#   --site=NAME       Web app name (searches /home/*/webapps/)
+#   --path=PATH       Full path to the web app (alternative to --site)
 #   --json            Output raw JSON instead of formatted report
 #   --plugins-only    Only check plugins
 #   --themes-only     Only check themes
@@ -21,8 +22,8 @@
 
 set -euo pipefail
 
-WEBROOT="/home/runcloud/webapps"
 SITE=""
+SITE_PATH=""
 JSON_OUTPUT=false
 CHECK_PLUGINS=true
 CHECK_THEMES=true
@@ -46,6 +47,7 @@ error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; }
 for i in "$@"; do
     case $i in
         --site=*)       SITE="${i#*=}" ;;
+        --path=*)       SITE_PATH="${i#*=}" ;;
         --json)         JSON_OUTPUT=true ;;
         --plugins-only) CHECK_THEMES=false ;;
         --themes-only)  CHECK_PLUGINS=false ;;
@@ -58,15 +60,29 @@ for i in "$@"; do
     esac
 done
 
-# --- Validate ---
-if [ -z "$SITE" ]; then
-    error "--site is required. Use --help for usage."
+# --- Resolve site path ---
+if [ -n "$SITE_PATH" ]; then
+    # --path= given directly
+    SITE=$(basename "$SITE_PATH")
+elif [ -n "$SITE" ]; then
+    # --site= given, search across all users
+    for base in /home/*/webapps/"$SITE"; do
+        if [ -d "$base" ]; then
+            SITE_PATH="$base"
+            break
+        fi
+    done
+    if [ -z "$SITE_PATH" ]; then
+        error "Site '$SITE' not found under /home/*/webapps/"
+        exit 1
+    fi
+else
+    error "--site or --path is required. Use --help for usage."
     exit 1
 fi
 
-SITE_PATH="$WEBROOT/$SITE"
 if [ ! -d "$SITE_PATH" ]; then
-    error "Site '$SITE' not found at $SITE_PATH"
+    error "Path not found: $SITE_PATH"
     exit 1
 fi
 

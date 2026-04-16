@@ -7,16 +7,18 @@
 #
 # Usage:
 #   ./wp-plugin-list.sh --site=APPNAME
+#   ./wp-plugin-list.sh --path=/home/user/webapps/APPNAME
 #
 
 set -euo pipefail
 
-WEBROOT="/home/runcloud/webapps"
 SITE=""
+SITE_PATH=""
 
 for i in "$@"; do
     case $i in
         --site=*) SITE="${i#*=}" ;;
+        --path=*) SITE_PATH="${i#*=}" ;;
         --help|-h)
             awk 'NR==1{next} /^[^#]/{exit} {sub(/^# ?/,""); print}' "$0"
             exit 0
@@ -25,11 +27,18 @@ for i in "$@"; do
     esac
 done
 
-if [ -z "$SITE" ]; then
-    echo '{"error":"--site is required"}'; exit 1
+# Resolve site path
+if [ -n "$SITE_PATH" ]; then
+    SITE=$(basename "$SITE_PATH")
+elif [ -n "$SITE" ]; then
+    for base in /home/*/webapps/"$SITE"; do
+        if [ -d "$base" ]; then SITE_PATH="$base"; break; fi
+    done
+    [ -z "$SITE_PATH" ] && { echo "{\"error\":\"site '$SITE' not found\"}"; exit 1; }
+else
+    echo '{"error":"--site or --path is required"}'; exit 1
 fi
 
-SITE_PATH="$WEBROOT/$SITE"
 if [ ! -f "$SITE_PATH/wp-config.php" ]; then
     echo '{"error":"not a WordPress site"}'; exit 1
 fi
