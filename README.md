@@ -11,6 +11,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Debug WP-CLI issues
 - [x] Update Node.js
 - [x] Automatic Tweak my.cnf
+- [x] Git untracked file cleanup (classify + commit or gitignore)
 - [ ] Batch update WP Site (using wp-cli)
 - [x] WP Security audit installer and WP Security Audit
 - [x] Server metrics collector with webhook reporting
@@ -341,6 +342,51 @@ Lock a WordPress site's filesystem and admin capabilities after launch. Prevents
 # 3. Re-freeze after updates
 ./wp-freeze.sh --site=myapp --action=freeze
 ```
+
+### wp-git-cleanup.sh
+
+Scan WordPress sites for untracked git files, classify them, and either report or commit them in logical groups. Adds production artifacts to `.gitignore` automatically. Skips frozen sites.
+
+**Classification + commit order:**
+
+| Group | Pattern | Commit message |
+|-------|---------|----------------|
+| `.gitignore` | Cache, backups, logs, litespeed, wpvivid, `.tmb/` | `chore: update .gitignore for production artifacts` |
+| WP Core | `wp-admin/`, `wp-includes/`, root `wp-*.php` | `chore: track wp core files` |
+| WP Themes | `wp-content/themes/THEME/` (one commit per theme) | `chore: track wp theme (THEME)` |
+| WP Plugins | `wp-content/plugins/SLUG/` (one commit per plugin) | `chore: track wp plugin (SLUG)` |
+| MU-Plugins | `wp-content/mu-plugins/` | `chore: track mu-plugins` |
+| Languages | `wp-content/languages/` (`.mo`/`.po`/`.pot`/`.l10n.php`) | `chore: track wp languages` |
+
+**Scan all sites (report only):**
+
+```bash
+./wp-git-cleanup.sh --action=scan
+```
+
+**Cleanup a specific site:**
+
+```bash
+./wp-git-cleanup.sh --site=myapp --action=cleanup
+```
+
+**Cleanup all sites:**
+
+```bash
+./wp-git-cleanup.sh --action=cleanup
+```
+
+**Preview changes without applying:**
+
+```bash
+./wp-git-cleanup.sh --site=myapp --action=cleanup --dry-run
+```
+
+**Notes:**
+- Supports multi-user layout (`/home/*/webapps/`)
+- Skips frozen sites (detected via `code-freeze.php` mu-plugin)
+- Language `.json` files are auto-ignored (WP-generated JED hashes)
+- Runs git as the site owner to avoid dubious ownership errors
 
 ### change-ssh-port.sh
 
