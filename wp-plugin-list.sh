@@ -49,7 +49,7 @@ else
     WP="sudo -u $SITE_OWNER $WP_CLI --path=$SITE_PATH"
 fi
 
-plugins=$($WP plugin list --fields=name,version,status,update --format=json 2>/dev/null || echo "[]")
-themes=$($WP theme list --fields=name,version,status,update --format=json 2>/dev/null || echo "[]")
+plugins=$($WP plugin list --fields=name,version,status,update,update_version --format=json 2>/dev/null || echo "[]")
+themes=$($WP theme list --fields=name,version,status,update,update_version --format=json 2>/dev/null || echo "[]")
 
 echo "{\"plugins\":$plugins,\"themes\":$themes}"
