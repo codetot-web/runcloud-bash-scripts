@@ -254,7 +254,7 @@ fi
 # Check plugins
 if [ "$CHECK_PLUGINS" = true ]; then
     [ "$JSON_OUTPUT" = false ] && info "Fetching plugin list..."
-    plugin_json=$($WP plugin list --fields=name,version,status --format=json 2>/dev/null || echo "[]")
+    plugin_json=$($WP plugin list --fields=name,version,status,update --format=json 2>/dev/null || echo "[]")
 
     if command -v python3 &>/dev/null; then
         plugin_list=$(python3 -c "
@@ -301,7 +301,7 @@ fi
 # Check themes
 if [ "$CHECK_THEMES" = true ]; then
     [ "$JSON_OUTPUT" = false ] && info "Fetching theme list..."
-    theme_json=$($WP theme list --fields=name,version,status --format=json 2>/dev/null || echo "[]")
+    theme_json=$($WP theme list --fields=name,version,status,update --format=json 2>/dev/null || echo "[]")
 
     if command -v python3 &>/dev/null; then
         theme_list=$(python3 -c "
@@ -403,3 +403,8 @@ fi
 
 echo ""
 success "Done with $SITE"
+
+# Append plugin/theme inventory as JSON footer (used by dashboard to avoid a second SSH call)
+echo ""
+echo "---PLUGIN_INVENTORY---"
+echo "{\"plugins\":${plugin_json:-[]},\"themes\":${theme_json:-[]}}"
