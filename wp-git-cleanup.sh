@@ -96,8 +96,13 @@ GITIGNORE_PATTERNS=(
     "wp-content/wp-cache-config.php"
     "wp-content/db.php"
     "wp-content/wpvivid*/"
+    "wp-content/upgrade-temp-backup/"
+    "wp-content/logs/"
+    "wp-content/sn-backups/"
     "wp-content/languages/**/*.json"
     ".tmb/"
+    "*.disabled"
+    "*.wfbkp"
 )
 
 # --- Helper: detect site owner ---
@@ -214,6 +219,11 @@ is_gitignore_candidate() {
         wp-content/fonts/*) return 0 ;;
         wp-content/ladipage/*) return 0 ;;
         wp-content/wpvivid*) return 0 ;;
+        wp-content/upgrade-temp-backup/*) return 0 ;;
+        wp-content/logs/*) return 0 ;;
+        wp-content/sn-backups/*) return 0 ;;
+        *.disabled) return 0 ;;
+        *.wfbkp) return 0 ;;
         .tmb/*) return 0 ;;
         *) return 1 ;;
     esac
