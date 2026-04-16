@@ -18,6 +18,8 @@
 #   --site=NAME          Required. Web app name under /home/runcloud/webapps/
 #   --action=ACTION      Required. One of: plugins, themes, core, all, status
 #   --exclude=LIST       Comma-separated plugin slugs to skip (only for plugins action)
+#   --exclude-themes=LIST  Comma-separated theme slugs to skip (only for themes action)
+#   --skip-themes        Skip ALL theme updates
 #   --dry-run            Show what would be updated without applying
 #   --no-git             Skip git checks (not recommended)
 #
@@ -28,6 +30,8 @@ WEBROOT="/home/runcloud/webapps"
 SITE=""
 ACTION=""
 EXCLUDE=""
+EXCLUDE_THEMES=""
+SKIP_THEMES=false
 DRY_RUN=false
 NO_GIT=false
 
@@ -48,9 +52,11 @@ for i in "$@"; do
     case $i in
         --site=*)    SITE="${i#*=}" ;;
         --action=*)  ACTION="${i#*=}" ;;
-        --exclude=*) EXCLUDE="${i#*=}" ;;
-        --dry-run)   DRY_RUN=true ;;
-        --no-git)    NO_GIT=true ;;
+        --exclude=*)        EXCLUDE="${i#*=}" ;;
+        --exclude-themes=*) EXCLUDE_THEMES="${i#*=}" ;;
+        --skip-themes)      SKIP_THEMES=true ;;
+        --dry-run)          DRY_RUN=true ;;
+        --no-git)           NO_GIT=true ;;
         --help|-h)
             awk 'NR==1{next} /^[^#]/{exit} {sub(/^# ?/,""); print}' "$0"
             exit 0
@@ -58,6 +64,17 @@ for i in "$@"; do
         *) error "Unknown option: $i"; exit 1 ;;
     esac
 done
+
+# --- Validate slug lists (only allow alphanumeric, hyphens, underscores, commas) ---
+validate_slug_list() {
+    local name="$1" value="$2"
+    if [ -n "$value" ] && [[ ! "$value" =~ ^[a-zA-Z0-9_,\ -]+$ ]]; then
+        error "$name contains invalid characters (allowed: a-z, 0-9, _, -, comma)"
+        exit 1
+    fi
+}
+validate_slug_list "--exclude" "$EXCLUDE"
+validate_slug_list "--exclude-themes" "$EXCLUDE_THEMES"
 
 # --- Validate ---
 if [ -z "$SITE" ] || [ -z "$ACTION" ]; then
@@ -167,11 +184,13 @@ update_plugins() {
     SKIPPED=0
     FAILED=0
 
-    for plugin in $AVAILABLE; do
+    while IFS= read -r plugin; do
+        [ -z "$plugin" ] && continue
         # Check blacklist
         skip=false
         for excluded in "${EXCLUDE_LIST[@]}"; do
-            excluded=$(echo "$excluded" | xargs) # trim whitespace
+            excluded="${excluded#"${excluded%%[![:space:]]*}"}"  # trim leading
+            excluded="${excluded%"${excluded##*[![:space:]]}"}"  # trim trailing
             if [ -n "$excluded" ] && [ "$plugin" = "$excluded" ]; then
                 skip=true
                 break
@@ -198,7 +217,7 @@ update_plugins() {
             error "Failed: $plugin"
             FAILED=$((FAILED + 1))
         fi
-    done
+    done <<< "$AVAILABLE"
 
     echo ""
     if [ "$DRY_RUN" = true ]; then
@@ -212,17 +231,65 @@ update_plugins() {
 update_themes() {
     info "Checking theme updates for $SITE..."
 
-    if [ "$DRY_RUN" = true ]; then
-        $WP theme list --update=available --format=table 2>/dev/null || success "All themes up to date"
+    if [ "$SKIP_THEMES" = true ]; then
+        warn "Skipped: all theme updates (--skip-themes)"
         return 0
     fi
 
-    OUTPUT=$($WP theme update --all 2>&1 || true)
-    echo "$OUTPUT"
-    if echo "$OUTPUT" | grep -q "Success"; then
-        success "Themes updated"
-    elif echo "$OUTPUT" | grep -q "already up to date"; then
+    # Get list of themes with updates
+    AVAILABLE=$($WP theme list --update=available --field=name 2>/dev/null || true)
+    if [ -z "$AVAILABLE" ]; then
         success "All themes are up to date"
+        return 0
+    fi
+
+    # Build exclude list
+    IFS=',' read -ra THEME_EXCLUDE_LIST <<< "$EXCLUDE_THEMES"
+
+    UPDATED=0
+    SKIPPED=0
+    FAILED=0
+
+    while IFS= read -r theme; do
+        [ -z "$theme" ] && continue
+        # Check exclusion list
+        skip=false
+        for excluded in "${THEME_EXCLUDE_LIST[@]}"; do
+            excluded="${excluded#"${excluded%%[![:space:]]*}"}"  # trim leading
+            excluded="${excluded%"${excluded##*[![:space:]]}"}"  # trim trailing
+            if [ -n "$excluded" ] && [ "$theme" = "$excluded" ]; then
+                skip=true
+                break
+            fi
+        done
+
+        if [ "$skip" = true ]; then
+            warn "Skipped: $theme (excluded)"
+            SKIPPED=$((SKIPPED + 1))
+            continue
+        fi
+
+        if [ "$DRY_RUN" = true ]; then
+            info "[dry-run] Would update: $theme"
+            UPDATED=$((UPDATED + 1))
+            continue
+        fi
+
+        info "Updating: $theme"
+        if $WP theme update "$theme" 2>&1; then
+            success "Updated: $theme"
+            UPDATED=$((UPDATED + 1))
+        else
+            error "Failed: $theme"
+            FAILED=$((FAILED + 1))
+        fi
+    done <<< "$AVAILABLE"
+
+    echo ""
+    if [ "$DRY_RUN" = true ]; then
+        info "[dry-run] Would update $UPDATED themes, skip $SKIPPED"
+    else
+        info "Updated: $UPDATED, Skipped: $SKIPPED, Failed: $FAILED"
     fi
 }
 
