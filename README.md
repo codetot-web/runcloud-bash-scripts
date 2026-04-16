@@ -12,7 +12,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Update Node.js
 - [x] Automatic Tweak my.cnf
 - [x] Git untracked file cleanup (classify + commit or gitignore)
-- [ ] Batch update WP Site (using wp-cli)
+- [x] Batch update WP Site (using wp-cli)
 - [x] WP Security audit installer and WP Security Audit
 - [x] Server metrics collector with webhook reporting
 - [x] Self-update (auto-pull latest from GitHub)
