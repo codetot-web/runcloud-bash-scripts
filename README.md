@@ -17,6 +17,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Server metrics collector with webhook reporting
 - [x] Self-update (auto-pull latest from GitHub)
 - [x] WordPress code freeze (lock filesystem + disable user management)
+- [x] WP vulnerability check (CVE scanning via WPVulnerability.net API)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -342,6 +343,37 @@ Lock a WordPress site's filesystem and admin capabilities after launch. Prevents
 # 3. Re-freeze after updates
 ./wp-freeze.sh --site=myapp --action=freeze
 ```
+
+### wp-vuln-check.sh
+
+Check installed WordPress plugins and themes for known CVEs using the free [WPVulnerability.net](https://www.wpvulnerability.net) API. Reports vulnerability name, CVE ID, CVSS score, and severity.
+
+**Check a site:**
+
+```bash
+./wp-vuln-check.sh --site=myapp
+```
+
+**Include WordPress core version check:**
+
+```bash
+./wp-vuln-check.sh --site=myapp --include-core
+```
+
+**JSON output (for automation):**
+
+```bash
+./wp-vuln-check.sh --site=myapp --json
+```
+
+**Check plugins only or themes only:**
+
+```bash
+./wp-vuln-check.sh --site=myapp --plugins-only
+./wp-vuln-check.sh --site=myapp --themes-only
+```
+
+**Requirements:** `python3` and `curl` must be available on the server (standard on Ubuntu 20+).
 
 ### wp-git-cleanup.sh
 
