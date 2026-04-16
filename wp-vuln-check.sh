@@ -404,7 +404,15 @@ fi
 echo ""
 success "Done with $SITE"
 
-# Append plugin/theme inventory as JSON footer (used by dashboard to avoid a second SSH call)
+# Append plugin/theme inventory + vuln data as JSON footer (used by dashboard)
 echo ""
 echo "---PLUGIN_INVENTORY---"
-echo "{\"plugins\":${plugin_json:-[]},\"themes\":${theme_json:-[]}}"
+# Build vuln JSON array
+vuln_json="["
+vfirst=true
+for entry in "${JSON_ENTRIES[@]+"${JSON_ENTRIES[@]}"}"; do
+    if [ "$vfirst" = true ]; then vfirst=false; else vuln_json="$vuln_json,"; fi
+    vuln_json="$vuln_json$entry"
+done
+vuln_json="$vuln_json]"
+echo "{\"plugins\":${plugin_json:-[]},\"themes\":${theme_json:-[]},\"vulns\":$vuln_json}"
