@@ -8,11 +8,11 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Fix web applications permission (runcloud chown, file 644 folder 755)
 - [x] Disk space cleanup (LiteSpeed cache, swap, journal logs)
 - [x] Change SSH port
-- [x] Debug WP-CLI issues
+- [x] Debug WP-CLI issues (removed — was a one-off debugging utility)
 - [x] Update Node.js
 - [x] Automatic Tweak my.cnf
 - [x] Git untracked file cleanup (classify + commit or gitignore)
-- [ ] Batch update WP Site (using wp-cli)
+- [x] Batch update WP Site (using wp-cli)
 - [x] WP Security audit installer and WP Security Audit
 - [x] Server metrics collector with webhook reporting
 - [x] Self-update (auto-pull latest from GitHub)
@@ -342,6 +342,61 @@ Lock a WordPress site's filesystem and admin capabilities after launch. Prevents
 # 3. Re-freeze after updates
 ./wp-freeze.sh --site=myapp --action=freeze
 ```
+
+### wp-update.sh
+
+Batch update WordPress plugins, themes, or core with blacklist support. Only runs on git-tracked sites (aborts on uncommitted changes). Auto-commits after update.
+
+**Update all plugins:**
+
+```bash
+./wp-update.sh --site=myapp --action=plugins
+```
+
+**Update plugins with exclusions:**
+
+```bash
+./wp-update.sh --site=myapp --action=plugins --exclude=acf-pro,gravityforms
+```
+
+**Update themes (with exclusions or skip all):**
+
+```bash
+./wp-update.sh --site=myapp --action=themes
+./wp-update.sh --site=myapp --action=themes --exclude-themes=mytheme
+./wp-update.sh --site=myapp --action=plugins --skip-themes
+```
+
+**Update WordPress core:**
+
+```bash
+./wp-update.sh --site=myapp --action=core
+```
+
+**Update everything (plugins + themes + core):**
+
+```bash
+./wp-update.sh --site=myapp --action=all
+```
+
+**Check pending updates without applying:**
+
+```bash
+./wp-update.sh --site=myapp --action=status
+./wp-update.sh --site=myapp --action=plugins --dry-run
+```
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--site=NAME` | Required. Web app name under `/home/runcloud/webapps/` |
+| `--action=ACTION` | Required. One of: `plugins`, `themes`, `core`, `all`, `status` |
+| `--exclude=LIST` | Comma-separated plugin slugs to skip |
+| `--exclude-themes=LIST` | Comma-separated theme slugs to skip |
+| `--skip-themes` | Skip ALL theme updates |
+| `--dry-run` | Show what would be updated without applying |
+| `--no-git` | Skip git checks (not recommended) |
 
 ### wp-git-cleanup.sh
 
