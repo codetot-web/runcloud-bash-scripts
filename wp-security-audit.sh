@@ -1,21 +1,35 @@
 #!/bin/bash
 #
 # WordPress Security Audit Script
-# Usage: wp-security-audit.sh [--folder=/path/to/webapp]
+# Usage: wp-security-audit.sh [--site=APPNAME] [--folder=/path/to/webapp]
 # Logs suspicious findings per webapp folder
 # Stops if required packages are missing
+#
+# Options:
+#   --site=NAME      Scan a single site by app name (resolves to /home/*/webapps/NAME)
+#   --folder=PATH    Scan a specific folder path
+#   (no args)        Scan all sites under /home/*/webapps/*
 
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
 
 # Default scan path
 SCANPATHS="/home/*/webapps/*"
 
-# Parse optional --folder argument
+# Parse arguments
 for arg in "$@"; do
   case $arg in
+    --site=*)
+      SITE="${arg#*=}"
+      # Resolve site path — support any user, not just runcloud
+      MATCH=$(find /home/*/webapps -maxdepth 1 -name "$SITE" -type d 2>/dev/null | head -1)
+      if [ -z "$MATCH" ]; then
+        echo "ERROR: Site '$SITE' not found under /home/*/webapps/"
+        exit 1
+      fi
+      SCANPATHS="$MATCH"
+      ;;
     --folder=*)
       SCANPATHS="${arg#*=}"
-      shift
       ;;
   esac
 done
