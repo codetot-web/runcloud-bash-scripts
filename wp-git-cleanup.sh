@@ -19,6 +19,7 @@
 #   --dry-run        Show what would happen without making changes
 #
 # Classification + commit order:
+#   0. Untrack       — remove obsolete files (git rm), untrack artifacts (git rm --cached)
 #   1. .gitignore    — add production artifact patterns, commit .gitignore
 #   2. WP Core       — wp-admin/, wp-includes/, root wp-*.php, etc.
 #   3. WP Themes     — wp-content/themes/THEME/ (one commit per theme)
@@ -246,6 +247,82 @@ is_gitignore_candidate() {
     esac
 }
 
+# --- Check if tracked file should be deleted entirely (not just untracked) ---
+# These files are obsolete — runcloud-go manages preferences at root level
+is_obsolete_tracked() {
+    local file="$1"
+    case "$file" in
+        .maintenance-flags|.maintenance-exclude) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# --- Untrack files that match gitignore patterns (and delete obsolete ones) ---
+# Tracked files matching gitignore candidates: git rm --cached (untrack, keep on disk)
+# Obsolete files (.maintenance-flags): git rm (delete from disk + untrack)
+untrack_ignored_files() {
+    local owner="$1" site_path="$2"
+
+    local tmp_tracked
+    tmp_tracked=$(mktemp)
+    run_git "$owner" "$site_path" ls-files > "$tmp_tracked"
+
+    local remove_files=()     # git rm — delete + untrack (obsolete)
+    local untrack_files=()    # git rm --cached — untrack only (artifacts)
+
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+
+        if is_obsolete_tracked "$file"; then
+            remove_files+=("$file")
+        elif is_gitignore_candidate "$file"; then
+            untrack_files+=("$file")
+        fi
+    done < "$tmp_tracked"
+
+    rm -f "$tmp_tracked"
+
+    local commits_made=0
+
+    # Delete obsolete files
+    if [ ${#remove_files[@]} -gt 0 ]; then
+        if [ "$DRY_RUN" = true ]; then
+            dry "  chore: remove obsolete tracked files (${#remove_files[@]} files)"
+            for f in "${remove_files[@]}"; do
+                dry "    rm $f"
+            done
+        else
+            run_git "$owner" "$site_path" rm -- "${remove_files[@]}" 2>/dev/null || true
+            run_git "$owner" "$site_path" commit -m "chore: remove obsolete tracked files" --quiet 2>/dev/null || true
+            success "  removed ${#remove_files[@]} obsolete files"
+        fi
+        commits_made=$((commits_made + 1))
+    fi
+
+    # Untrack production artifacts (keep on disk)
+    if [ ${#untrack_files[@]} -gt 0 ]; then
+        if [ "$DRY_RUN" = true ]; then
+            dry "  chore: untrack production artifacts (${#untrack_files[@]} files)"
+            for f in "${untrack_files[@]}"; do
+                dry "    untrack $f"
+            done
+        else
+            local batch_size=100
+            local i=0
+            while [ $i -lt ${#untrack_files[@]} ]; do
+                local batch=("${untrack_files[@]:$i:$batch_size}")
+                run_git "$owner" "$site_path" rm --cached -- "${batch[@]}" 2>/dev/null || true
+                i=$((i + batch_size))
+            done
+            run_git "$owner" "$site_path" commit -m "chore: untrack production artifacts" --quiet 2>/dev/null || true
+            success "  untracked ${#untrack_files[@]} production artifacts"
+        fi
+        commits_made=$((commits_made + 1))
+    fi
+
+    return 0
+}
+
 # --- Scan a single site ---
 scan_site() {
     local site_path="$1"
@@ -271,6 +348,22 @@ scan_site() {
     local owner
     owner=$(detect_owner "$site_path")
 
+    # Check for tracked files that shouldn't be tracked
+    local tmp_tracked_check
+    tmp_tracked_check=$(mktemp)
+    run_git "$owner" "$site_path" ls-files > "$tmp_tracked_check"
+
+    local obsolete_count=0 artifact_count=0
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        if is_obsolete_tracked "$file"; then
+            obsolete_count=$((obsolete_count + 1))
+        elif is_gitignore_candidate "$file"; then
+            artifact_count=$((artifact_count + 1))
+        fi
+    done < "$tmp_tracked_check"
+    rm -f "$tmp_tracked_check"
+
     # Get untracked files into a temp file
     local tmp_untracked
     tmp_untracked=$(mktemp)
@@ -279,7 +372,7 @@ scan_site() {
 
     local total
     total=$(wc -l < "$tmp_untracked" | tr -d ' ')
-    if [ "$total" -eq 0 ]; then
+    if [ "$total" -eq 0 ] && [ "$obsolete_count" -eq 0 ] && [ "$artifact_count" -eq 0 ]; then
         return 0
     fi
 
@@ -289,6 +382,9 @@ scan_site() {
     # Print summary
     echo ""
     info "=== $webapp_name ($site_path) — $total untracked ==="
+
+    [ "$obsolete_count" -gt 0 ] && warn "  obsolete:    $obsolete_count tracked files to remove"
+    [ "$artifact_count" -gt 0 ] && warn "  artifacts:   $artifact_count tracked files to untrack"
 
     [ ${#GITIGNORE_FILES[@]} -gt 0 ]  && info "  gitignore:   ${#GITIGNORE_FILES[@]} files"
     [ ${#CORE_FILES[@]} -gt 0 ]       && info "  wp-core:     ${#CORE_FILES[@]} files"
@@ -480,6 +576,9 @@ cleanup_site() {
     total=$(wc -l < "$tmp_untracked" | tr -d ' ')
 
     local commits_made=0
+
+    # Step 0: Untrack files matching gitignore patterns + remove obsolete files
+    untrack_ignored_files "$owner" "$site_path"
 
     # Always check modified tracked files (fonts, themes, core, languages)
     # even when there are no untracked files
