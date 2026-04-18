@@ -435,8 +435,22 @@ cleanup_site() {
 
     local total
     total=$(wc -l < "$tmp_untracked" | tr -d ' ')
+
+    local commits_made=0
+
+    # Always check modified tracked files (fonts, themes, core, languages)
+    # even when there are no untracked files
+    if commit_modified_tracked "$owner" "$site_path"; then
+        : # no modified tracked files
+    else
+        commits_made=$((commits_made + 1))
+    fi
+
     if [ "$total" -eq 0 ]; then
         rm -f "$tmp_untracked"
+        if [ "$commits_made" -gt 0 ]; then
+            success "$commits_made commits for $webapp_name (modified tracked files only)"
+        fi
         return 0
     fi
 
@@ -445,8 +459,6 @@ cleanup_site() {
 
     # Classify
     classify_files "$tmp_untracked"
-
-    local commits_made=0
 
     # Step 1: Update .gitignore
     if [ ${#GITIGNORE_FILES[@]} -gt 0 ]; then
@@ -508,14 +520,7 @@ cleanup_site() {
         commits_made=$((commits_made + 1))
     fi
 
-    # Step 8: Commit modified tracked files (wp core, languages, fonts, themes)
-    if commit_modified_tracked "$owner" "$site_path"; then
-        : # no modified tracked files
-    else
-        commits_made=$((commits_made + 1))
-    fi
-
-    # Step 9: Report remaining
+    # Step 8: Report remaining
     if [ ${#REMAINING_FILES[@]} -gt 0 ]; then
         warn "Remaining unclassified files (${#REMAINING_FILES[@]}):"
         for f in "${REMAINING_FILES[@]}"; do
