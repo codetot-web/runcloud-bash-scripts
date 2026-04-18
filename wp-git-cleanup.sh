@@ -133,6 +133,12 @@ get_untracked() {
     run_git "$owner" "$path" ls-files --others --exclude-standard 2>/dev/null || true
 }
 
+# --- Helper: get modified tracked files ---
+get_modified() {
+    local owner="$1" path="$2"
+    run_git "$owner" "$path" diff --name-only 2>/dev/null || true
+}
+
 # --- Classify untracked files ---
 # Populates associative arrays for each category
 classify_files() {
@@ -311,6 +317,49 @@ scan_site() {
     trap - RETURN
 }
 
+# --- Commit modified tracked files (wp core + languages) ---
+commit_modified_tracked() {
+    local owner="$1" site_path="$2"
+
+    local tmp_modified
+    tmp_modified=$(mktemp)
+    get_modified "$owner" "$site_path" > "$tmp_modified"
+
+    # Filter to safe auto-commit paths only
+    local safe_files=()
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        if [[ "$file" == wp-admin/* ]] || [[ "$file" == wp-includes/* ]] || \
+           [[ "$file" == wp-content/languages/* ]] || \
+           [[ "$file" =~ ^wp-[^/]+\.php$ ]] || \
+           [[ "$file" == "index.php" ]] || [[ "$file" == "xmlrpc.php" ]]; then
+            safe_files+=("$file")
+        fi
+    done < "$tmp_modified"
+    rm -f "$tmp_modified"
+
+    local count=${#safe_files[@]}
+    [ "$count" -eq 0 ] && return 0
+
+    if [ "$DRY_RUN" = true ]; then
+        dry "  chore: track modified wp core/language files ($count files)"
+        return 0
+    fi
+
+    # Stage in batches
+    local batch_size=100
+    local i=0
+    while [ $i -lt $count ]; do
+        local batch=("${safe_files[@]:$i:$batch_size}")
+        run_git "$owner" "$site_path" add -- "${batch[@]}" 2>/dev/null || true
+        i=$((i + batch_size))
+    done
+
+    run_git "$owner" "$site_path" commit -m "chore: track modified wp core/language files" --quiet 2>/dev/null || true
+    success "  chore: track modified wp core/language files ($count files)"
+    return 1  # signal that a commit was made (for counting)
+}
+
 # --- Cleanup a single site ---
 cleanup_site() {
     local site_path="$1"
@@ -405,7 +454,14 @@ cleanup_site() {
         commits_made=$((commits_made + 1))
     fi
 
-    # Step 7: Report remaining
+    # Step 7: Commit modified tracked files (wp core + languages)
+    if commit_modified_tracked "$owner" "$site_path"; then
+        : # no modified tracked files
+    else
+        commits_made=$((commits_made + 1))
+    fi
+
+    # Step 8: Report remaining
     if [ ${#REMAINING_FILES[@]} -gt 0 ]; then
         warn "Remaining unclassified files (${#REMAINING_FILES[@]}):"
         for f in "${REMAINING_FILES[@]}"; do
