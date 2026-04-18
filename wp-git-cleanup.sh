@@ -289,7 +289,7 @@ untrack_ignored_files() {
                 dry "    rm $f"
             done
         else
-            run_git "$owner" "$site_path" rm -- "${remove_files[@]}" 2>/dev/null || true
+            run_git "$owner" "$site_path" rm -f -- "${remove_files[@]}" 2>/dev/null || true
             run_git "$owner" "$site_path" commit -m "chore: remove obsolete tracked files" --quiet 2>/dev/null || true
             success "  removed ${#remove_files[@]} obsolete files"
         fi
