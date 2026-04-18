@@ -24,7 +24,10 @@
 #   3. WP Themes     — wp-content/themes/THEME/ (one commit per theme)
 #   4. WP Plugins    — wp-content/plugins/SLUG/ (one commit per plugin)
 #   5. MU-Plugins    — wp-content/mu-plugins/
-#   6. Remaining     — reported but not auto-committed
+#   6. Fonts         — wp-content/fonts/
+#   7. Languages     — wp-content/languages/ (.mo/.po/.pot/.l10n.php)
+#   8. Modified tracked — core, languages, fonts, themes (per-theme commits)
+#   9. Remaining     — reported but not auto-committed
 #
 
 set -euo pipefail
@@ -149,6 +152,7 @@ classify_files() {
     THEME_FILES=()       # associative: populated via THEME_GROUPS
     PLUGIN_FILES=()      # associative: populated via PLUGIN_GROUPS
     MU_PLUGIN_FILES=()
+    FONT_FILES=()
     LANGUAGE_FILES=()
     GITIGNORE_FILES=()
     REMAINING_FILES=()
@@ -169,6 +173,9 @@ classify_files() {
              [[ "$file" == "index.php" ]] || [[ "$file" == "xmlrpc.php" ]] || \
              [[ "$file" == "license.txt" ]] || [[ "$file" == "readme.html" ]]; then
             CORE_FILES+=("$file")
+        # Fonts
+        elif [[ "$file" == wp-content/fonts/* ]]; then
+            FONT_FILES+=("$file")
         # Languages — track .mo/.po/.pot/.l10n.php, ignore .json (auto-generated JED hashes)
         elif [[ "$file" == wp-content/languages/* ]]; then
             if [[ "$file" == *.json ]]; then
@@ -216,7 +223,6 @@ is_gitignore_candidate() {
     [[ "$file" == wp-content/backup* ]]              && return 0
     [[ "$file" == wp-content/et-cache/* ]]           && return 0
     [[ "$file" == wp-content/cache/* ]]              && return 0
-    [[ "$file" == wp-content/fonts/* ]]              && return 0
     [[ "$file" == wp-content/ladipage/* ]]           && return 0
     [[ "$file" == wp-content/upgrade-temp-backup/* ]] && return 0
     [[ "$file" == wp-content/logs/* ]]               && return 0
@@ -304,6 +310,7 @@ scan_site() {
     fi
 
     [ ${#MU_PLUGIN_FILES[@]} -gt 0 ]  && info "  mu-plugins:  ${#MU_PLUGIN_FILES[@]} files"
+    [ ${#FONT_FILES[@]} -gt 0 ]       && info "  fonts:       ${#FONT_FILES[@]} files"
     [ ${#LANGUAGE_FILES[@]} -gt 0 ]   && info "  languages:   ${#LANGUAGE_FILES[@]} files"
     [ ${#REMAINING_FILES[@]} -gt 0 ]  && warn "  remaining:   ${#REMAINING_FILES[@]} files"
 
@@ -317,7 +324,7 @@ scan_site() {
     trap - RETURN
 }
 
-# --- Commit modified tracked files (wp core + languages) ---
+# --- Commit modified tracked files (wp core, languages, fonts, themes) ---
 commit_modified_tracked() {
     local owner="$1" site_path="$2"
 
@@ -325,39 +332,80 @@ commit_modified_tracked() {
     tmp_modified=$(mktemp)
     get_modified "$owner" "$site_path" > "$tmp_modified"
 
-    # Filter to safe auto-commit paths only
-    local safe_files=()
+    local total_modified
+    total_modified=$(wc -l < "$tmp_modified" | tr -d ' ')
+    [ "$total_modified" -eq 0 ] && { rm -f "$tmp_modified"; return 0; }
+
+    local commits_made=0
+
+    # Group 1: WP core + language files (single commit)
+    local core_lang_files=()
     while IFS= read -r file; do
         [ -z "$file" ] && continue
         if [[ "$file" == wp-admin/* ]] || [[ "$file" == wp-includes/* ]] || \
            [[ "$file" == wp-content/languages/* ]] || \
            [[ "$file" =~ ^wp-[^/]+\.php$ ]] || \
            [[ "$file" == "index.php" ]] || [[ "$file" == "xmlrpc.php" ]]; then
-            safe_files+=("$file")
+            core_lang_files+=("$file")
         fi
     done < "$tmp_modified"
-    rm -f "$tmp_modified"
 
-    local count=${#safe_files[@]}
-    [ "$count" -eq 0 ] && return 0
-
-    if [ "$DRY_RUN" = true ]; then
-        dry "  chore: track modified wp core/language files ($count files)"
-        return 0
+    if [ ${#core_lang_files[@]} -gt 0 ]; then
+        if [ "$DRY_RUN" = true ]; then
+            dry "  chore: track modified wp core/language files (${#core_lang_files[@]} files)"
+        else
+            commit_files "$owner" "$site_path" "chore: track modified wp core/language files" "${core_lang_files[@]}"
+        fi
+        commits_made=$((commits_made + 1))
     fi
 
-    # Stage in batches
-    local batch_size=100
-    local i=0
-    while [ $i -lt $count ]; do
-        local batch=("${safe_files[@]:$i:$batch_size}")
-        run_git "$owner" "$site_path" add -- "${batch[@]}" 2>/dev/null || true
-        i=$((i + batch_size))
+    # Group 2: Font files (single commit)
+    local font_files=()
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        [[ "$file" == wp-content/fonts/* ]] && font_files+=("$file")
+    done < "$tmp_modified"
+
+    if [ ${#font_files[@]} -gt 0 ]; then
+        if [ "$DRY_RUN" = true ]; then
+            dry "  chore: track modified wp fonts (${#font_files[@]} files)"
+        else
+            commit_files "$owner" "$site_path" "chore: track modified wp fonts" "${font_files[@]}"
+        fi
+        commits_made=$((commits_made + 1))
+    fi
+
+    # Group 3: Theme files (one commit per theme)
+    declare -A modified_theme_slugs=()
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        if [[ "$file" == wp-content/themes/* ]]; then
+            local theme
+            theme=$(echo "$file" | cut -d/ -f3)
+            [ -n "$theme" ] && modified_theme_slugs["$theme"]=1
+        fi
+    done < "$tmp_modified"
+
+    for theme in "${!modified_theme_slugs[@]}"; do
+        local theme_files=()
+        while IFS= read -r f; do
+            [ -n "$f" ] && theme_files+=("$f")
+        done < <(grep "^wp-content/themes/$theme/" "$tmp_modified" 2>/dev/null || true)
+
+        if [ ${#theme_files[@]} -gt 0 ]; then
+            if [ "$DRY_RUN" = true ]; then
+                dry "  chore: track modified wp theme ($theme) (${#theme_files[@]} files)"
+            else
+                commit_files "$owner" "$site_path" "chore: track modified wp theme ($theme)" "${theme_files[@]}"
+            fi
+            commits_made=$((commits_made + 1))
+        fi
     done
 
-    run_git "$owner" "$site_path" commit -m "chore: track modified wp core/language files" --quiet 2>/dev/null || true
-    success "  chore: track modified wp core/language files ($count files)"
-    return 1  # signal that a commit was made (for counting)
+    rm -f "$tmp_modified"
+
+    [ "$commits_made" -eq 0 ] && return 0
+    return 1  # signal that commits were made (for counting)
 }
 
 # --- Cleanup a single site ---
@@ -448,20 +496,26 @@ cleanup_site() {
         commits_made=$((commits_made + 1))
     fi
 
-    # Step 6: Languages
+    # Step 6: Fonts
+    if [ ${#FONT_FILES[@]} -gt 0 ]; then
+        commit_files "$owner" "$site_path" "chore: track wp fonts" "${FONT_FILES[@]}"
+        commits_made=$((commits_made + 1))
+    fi
+
+    # Step 7: Languages
     if [ ${#LANGUAGE_FILES[@]} -gt 0 ]; then
         commit_files "$owner" "$site_path" "chore: track wp languages" "${LANGUAGE_FILES[@]}"
         commits_made=$((commits_made + 1))
     fi
 
-    # Step 7: Commit modified tracked files (wp core + languages)
+    # Step 8: Commit modified tracked files (wp core, languages, fonts, themes)
     if commit_modified_tracked "$owner" "$site_path"; then
         : # no modified tracked files
     else
         commits_made=$((commits_made + 1))
     fi
 
-    # Step 8: Report remaining
+    # Step 9: Report remaining
     if [ ${#REMAINING_FILES[@]} -gt 0 ]; then
         warn "Remaining unclassified files (${#REMAINING_FILES[@]}):"
         for f in "${REMAINING_FILES[@]}"; do
