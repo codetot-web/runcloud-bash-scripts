@@ -26,7 +26,7 @@
 #   5. MU-Plugins    — wp-content/mu-plugins/
 #   6. Fonts         — wp-content/fonts/
 #   7. Languages     — wp-content/languages/ (.mo/.po/.pot/.l10n.php)
-#   8. Modified tracked — core, languages, fonts, themes (per-theme commits)
+#   8. Modified tracked — core, languages, fonts, themes, plugins, mu-plugins
 #   9. Remaining     — reported but not auto-committed
 #
 
@@ -324,7 +324,7 @@ scan_site() {
     trap - RETURN
 }
 
-# --- Commit modified tracked files (wp core, languages, fonts, themes) ---
+# --- Commit modified tracked files (wp core, languages, fonts, themes, plugins, mu-plugins) ---
 commit_modified_tracked() {
     local owner="$1" site_path="$2"
 
@@ -401,6 +401,49 @@ commit_modified_tracked() {
             commits_made=$((commits_made + 1))
         fi
     done
+
+    # Group 4: Plugin files (one commit per plugin)
+    declare -A modified_plugin_slugs=()
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        if [[ "$file" == wp-content/plugins/* ]]; then
+            local plugin
+            plugin=$(echo "$file" | cut -d/ -f3)
+            [ -n "$plugin" ] && modified_plugin_slugs["$plugin"]=1
+        fi
+    done < "$tmp_modified"
+
+    for plugin in "${!modified_plugin_slugs[@]}"; do
+        local plugin_files=()
+        while IFS= read -r f; do
+            [ -n "$f" ] && plugin_files+=("$f")
+        done < <(grep "^wp-content/plugins/$plugin/" "$tmp_modified" 2>/dev/null || true)
+
+        if [ ${#plugin_files[@]} -gt 0 ]; then
+            if [ "$DRY_RUN" = true ]; then
+                dry "  chore: track modified wp plugin ($plugin) (${#plugin_files[@]} files)"
+            else
+                commit_files "$owner" "$site_path" "chore: track modified wp plugin ($plugin)" "${plugin_files[@]}"
+            fi
+            commits_made=$((commits_made + 1))
+        fi
+    done
+
+    # Group 5: MU-Plugin files (single commit)
+    local mu_plugin_files=()
+    while IFS= read -r file; do
+        [ -z "$file" ] && continue
+        [[ "$file" == wp-content/mu-plugins/* ]] && mu_plugin_files+=("$file")
+    done < "$tmp_modified"
+
+    if [ ${#mu_plugin_files[@]} -gt 0 ]; then
+        if [ "$DRY_RUN" = true ]; then
+            dry "  chore: track modified mu-plugins (${#mu_plugin_files[@]} files)"
+        else
+            commit_files "$owner" "$site_path" "chore: track modified mu-plugins" "${mu_plugin_files[@]}"
+        fi
+        commits_made=$((commits_made + 1))
+    fi
 
     rm -f "$tmp_modified"
 
