@@ -265,6 +265,7 @@ untrack_ignored_files() {
 
     local tmp_tracked
     tmp_tracked=$(mktemp)
+    trap "rm -f $tmp_tracked" RETURN
     run_git "$owner" "$site_path" ls-files > "$tmp_tracked"
 
     local remove_files=()     # git rm — delete + untrack (obsolete)
@@ -280,10 +281,6 @@ untrack_ignored_files() {
         fi
     done < "$tmp_tracked"
 
-    rm -f "$tmp_tracked"
-
-    local commits_made=0
-
     # Delete obsolete files
     if [ ${#remove_files[@]} -gt 0 ]; then
         if [ "$DRY_RUN" = true ]; then
@@ -296,7 +293,6 @@ untrack_ignored_files() {
             run_git "$owner" "$site_path" commit -m "chore: remove obsolete tracked files" --quiet 2>/dev/null || true
             success "  removed ${#remove_files[@]} obsolete files"
         fi
-        commits_made=$((commits_made + 1))
     fi
 
     # Untrack production artifacts (keep on disk)
@@ -317,10 +313,7 @@ untrack_ignored_files() {
             run_git "$owner" "$site_path" commit -m "chore: untrack production artifacts" --quiet 2>/dev/null || true
             success "  untracked ${#untrack_files[@]} production artifacts"
         fi
-        commits_made=$((commits_made + 1))
     fi
-
-    return 0
 }
 
 # --- Scan a single site ---
@@ -351,7 +344,7 @@ scan_site() {
     # Check for tracked files that shouldn't be tracked
     local tmp_tracked_check
     tmp_tracked_check=$(mktemp)
-    run_git "$owner" "$site_path" ls-files > "$tmp_tracked_check"
+    run_git "$owner" "$site_path" ls-files > "$tmp_tracked_check" || true
 
     local obsolete_count=0 artifact_count=0
     while IFS= read -r file; do
