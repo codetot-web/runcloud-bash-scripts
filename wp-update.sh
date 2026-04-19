@@ -120,6 +120,80 @@ else
     WP="sudo -u $SITE_OWNER $WP_CLI --path=$SITE_PATH"
 fi
 
+# --- Detect site PHP version (FPM/LSPHP, not CLI) ---
+# RunCloud uses per-site FPM pools or LiteSpeed LSAPI.
+# The CLI php -v may differ from the web PHP version, causing compatibility issues.
+SITE_PHP_VERSION=""
+SITE_PHP_BIN=""
+
+# Method 1: nginx + PHP-FPM pools (/etc/phpXYrc/fpm.d/SITE.conf)
+for phpdir in /etc/php85rc /etc/php84rc /etc/php83rc /etc/php82rc /etc/php81rc /etc/php80rc /etc/php74rc /etc/php73rc /etc/php72rc; do
+    if [ -f "$phpdir/fpm.d/$SITE.conf" ]; then
+        ver=$(basename "$phpdir" | sed 's/^php//;s/rc$//' | sed 's/\(.\)\(.\)/\1.\2/')
+        SITE_PHP_VERSION="$ver"
+        break
+    fi
+done
+
+# Method 2: OpenLiteSpeed LSAPI (grep lsphp path from vhost config)
+if [ -z "$SITE_PHP_VERSION" ]; then
+    lsphp_path=$(grep -r 'lsphp' /etc/lsws-rc/conf.d/"$SITE".d/ /etc/lsws-rc/conf.d/"$SITE".vhosts.d/ 2>/dev/null | grep -oP '/usr/local/lsws/lsphp\K[0-9]+' | head -1 || true)
+    if [ -n "$lsphp_path" ]; then
+        SITE_PHP_VERSION=$(echo "$lsphp_path" | sed 's/\(.\)\(.\)/\1.\2/')
+    fi
+fi
+
+# Fallback: use CLI version
+if [ -z "$SITE_PHP_VERSION" ]; then
+    SITE_PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
+fi
+
+# Find the PHP binary matching the detected version (for syntax checks)
+if [ -n "$SITE_PHP_VERSION" ]; then
+    php_tag=$(echo "$SITE_PHP_VERSION" | tr -d '.')
+    # Try RunCloud FPM binary first, then LiteSpeed binary
+    for candidate in "/RunCloud/Packages/php${php_tag}rc/bin/php" "/usr/local/lsws/lsphp${php_tag}/bin/php"; do
+        if [ -x "$candidate" ]; then
+            SITE_PHP_BIN="$candidate"
+            break
+        fi
+    done
+    info "Site PHP version (web): $SITE_PHP_VERSION"
+fi
+
+# --- Helper: compare version strings (returns 0 if $1 >= $2) ---
+version_gte() {
+    [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" = "$2" ]
+}
+
+# --- Helper: PHP syntax check on a directory ---
+# Returns 0 if all PHP files pass, 1 if any parse error found.
+# Sets SYNTAX_ERR with the first error message.
+php_syntax_check() {
+    local dir="$1"
+    SYNTAX_ERR=""
+    [ -z "$SITE_PHP_BIN" ] && return 0
+    [ ! -d "$dir" ] && return 0
+    SYNTAX_ERR=$(find "$dir" -name '*.php' -print0 | xargs -0 "$SITE_PHP_BIN" -l 2>&1 | grep -i "parse error" | head -1 || true)
+    [ -z "$SYNTAX_ERR" ] && return 0
+    return 1
+}
+
+# --- Helper: rollback a plugin or theme via git ---
+git_rollback() {
+    local type="$1" slug="$2"  # type = plugins or themes
+    if [ -d "$SITE_PATH/.git" ]; then
+        local git_cmd="sudo -u $SITE_OWNER git"
+        $git_cmd -C "$SITE_PATH" checkout -- "wp-content/$type/$slug/" 2>/dev/null || true
+        success "Rolled back: $slug"
+    else
+        error "Cannot rollback without git — disable $slug manually!"
+    fi
+}
+
+# --- Git command setup ---
+GIT_CMD="sudo -u $SITE_OWNER git"
+
 # --- Git check ---
 if [ "$NO_GIT" = false ] && [ -d "$SITE_PATH/.git" ]; then
     cd "$SITE_PATH"
@@ -203,6 +277,16 @@ update_plugins() {
             continue
         fi
 
+        # Check PHP compatibility before updating
+        if [ -n "$SITE_PHP_VERSION" ]; then
+            REQUIRES_PHP=$($WP plugin get "$plugin" --field=requires_php 2>/dev/null || true)
+            if [ -n "$REQUIRES_PHP" ] && ! version_gte "$SITE_PHP_VERSION" "$REQUIRES_PHP"; then
+                warn "Skipped: $plugin (requires PHP $REQUIRES_PHP, site runs $SITE_PHP_VERSION)"
+                SKIPPED=$((SKIPPED + 1))
+                continue
+            fi
+        fi
+
         if [ "$DRY_RUN" = true ]; then
             info "[dry-run] Would update: $plugin"
             UPDATED=$((UPDATED + 1))
@@ -211,6 +295,14 @@ update_plugins() {
 
         info "Updating: $plugin"
         if $WP plugin update "$plugin" 2>&1; then
+            # Post-update: verify PHP syntax with site's FPM/LSPHP version
+            if ! php_syntax_check "$SITE_PATH/wp-content/plugins/$plugin"; then
+                error "PHP $SITE_PHP_VERSION syntax error: $SYNTAX_ERR"
+                warn "Rolling back: $plugin"
+                git_rollback plugins "$plugin"
+                FAILED=$((FAILED + 1))
+                continue
+            fi
             success "Updated: $plugin"
             UPDATED=$((UPDATED + 1))
         else
@@ -269,6 +361,16 @@ update_themes() {
             continue
         fi
 
+        # Check PHP compatibility before updating
+        if [ -n "$SITE_PHP_VERSION" ]; then
+            REQUIRES_PHP=$($WP theme get "$theme" --field=requires_php 2>/dev/null || true)
+            if [ -n "$REQUIRES_PHP" ] && ! version_gte "$SITE_PHP_VERSION" "$REQUIRES_PHP"; then
+                warn "Skipped: $theme (requires PHP $REQUIRES_PHP, site runs $SITE_PHP_VERSION)"
+                SKIPPED=$((SKIPPED + 1))
+                continue
+            fi
+        fi
+
         if [ "$DRY_RUN" = true ]; then
             info "[dry-run] Would update: $theme"
             UPDATED=$((UPDATED + 1))
@@ -277,6 +379,14 @@ update_themes() {
 
         info "Updating: $theme"
         if $WP theme update "$theme" 2>&1; then
+            # Post-update: verify PHP syntax with site's FPM/LSPHP version
+            if ! php_syntax_check "$SITE_PATH/wp-content/themes/$theme"; then
+                error "PHP $SITE_PHP_VERSION syntax error: $SYNTAX_ERR"
+                warn "Rolling back: $theme"
+                git_rollback themes "$theme"
+                FAILED=$((FAILED + 1))
+                continue
+            fi
             success "Updated: $theme"
             UPDATED=$((UPDATED + 1))
         else
