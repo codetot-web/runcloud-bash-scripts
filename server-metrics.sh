@@ -149,6 +149,38 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 fi
             fi
 
+            # PHP version detection — check FPM pool config to find the actual web PHP version
+            php_field=""
+            php_ver=""
+            # Method 1: RunCloud FPM pool config (/etc/phpXYrc/fpm.d/SITE.conf)
+            for phpdir in /etc/php85rc /etc/php84rc /etc/php83rc /etc/php82rc /etc/php81rc /etc/php80rc /etc/php74rc /etc/php73rc; do
+                if [ -f "$phpdir/fpm.d/$webapp_name.conf" ]; then
+                    php_ver=$(basename "$phpdir" | sed 's/^php//;s/rc$//' | sed 's/\(.\)\(.\)/\1.\2/')
+                    break
+                fi
+            done
+            # Method 2: check FPM socket and trace to master process
+            if [ -z "$php_ver" ] && [ -S "/run/${webapp_name}.sock" ] || [ -S "/var/run/${webapp_name}.sock" ]; then
+                worker_pid=$(pgrep -f "pool $webapp_name" 2>/dev/null | head -1)
+                if [ -n "$worker_pid" ]; then
+                    master_pid=$(awk '/^PPid:/{print $2}' /proc/"$worker_pid"/status 2>/dev/null)
+                    if [ -n "$master_pid" ]; then
+                        master_conf=$(tr '\0' ' ' < /proc/"$master_pid"/cmdline 2>/dev/null)
+                        # Extract version from config path like /etc/php74rc/php-fpm.conf or /etc/php/8.2/fpm/php-fpm.conf
+                        ver_from_conf=$(echo "$master_conf" | grep -oP 'php\K[0-9]+(?=rc/)' | head -1)
+                        if [ -n "$ver_from_conf" ]; then
+                            php_ver=$(echo "$ver_from_conf" | sed 's/\(.\)\(.\)/\1.\2/')
+                        else
+                            ver_from_conf=$(echo "$master_conf" | grep -oP 'php/\K[0-9]+\.[0-9]+' | head -1)
+                            [ -n "$ver_from_conf" ] && php_ver="$ver_from_conf"
+                        fi
+                    fi
+                fi
+            fi
+            if [ -n "$php_ver" ]; then
+                php_field=",\"php_version\":\"$php_ver\""
+            fi
+
             # Git detection — run as site owner to avoid "dubious ownership" errors
             git_field=""
             if [ -d "$app_path/.git" ]; then
@@ -169,7 +201,7 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 freeze_field=",\"is_frozen\":true"
             fi
 
-            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields$git_field$freeze_field}")
+            WEB_APPS_ENTRIES+=("{\"username\":\"$username\",\"webapp_name\":\"$webapp_name\",\"path\":\"$app_path\"$disk_field$wp_fields$php_field$git_field$freeze_field}")
         done
     done
     if [ ${#WEB_APPS_ENTRIES[@]} -gt 0 ]; then

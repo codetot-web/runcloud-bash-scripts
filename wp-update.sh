@@ -143,9 +143,29 @@ if [ -z "$SITE_PHP_VERSION" ]; then
     fi
 fi
 
-# Fallback: use CLI version
+# Method 3: create a temp PHP file and curl it via the site's domain
+# This tests the actual PHP version the web server uses (most reliable).
+if [ -z "$SITE_PHP_VERSION" ]; then
+    _ver_file="$SITE_PATH/.php-version-check-$$-$(date +%s).php"
+    echo '<?php echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' > "$_ver_file"
+    chown "$SITE_OWNER":"$SITE_OWNER" "$_ver_file" 2>/dev/null || true
+    _ver_filename=$(basename "$_ver_file")
+    # Detect site URL from wp-config or wp-cli
+    _site_url=$($WP option get siteurl 2>/dev/null || grep -oP "define\s*\(\s*'WP_SITEURL'\s*,\s*'\\K[^']+" "$SITE_PATH/wp-config.php" 2>/dev/null || true)
+    if [ -n "$_site_url" ]; then
+        _web_php=$(curl -skL --max-time 5 "${_site_url}/${_ver_filename}" 2>/dev/null || true)
+        if [[ "$_web_php" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            SITE_PHP_VERSION="$_web_php"
+            info "Detected web PHP via HTTP probe: $SITE_PHP_VERSION"
+        fi
+    fi
+    rm -f "$_ver_file" 2>/dev/null || true
+fi
+
+# Fallback: use CLI version (WARN: may differ from web PHP)
 if [ -z "$SITE_PHP_VERSION" ]; then
     SITE_PHP_VERSION=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;' 2>/dev/null || echo "")
+    warn "Using CLI PHP version ($SITE_PHP_VERSION) — web PHP may differ!"
 fi
 
 # Find the PHP binary matching the detected version (for syntax checks)
