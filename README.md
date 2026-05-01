@@ -1,4 +1,12 @@
-# RunCloud - Bash scripts
+# runcloud-bash-scripts
+
+> A production-grade Bash toolkit for RunCloud sysadmins managing WordPress fleets at scale.
+
+Battle-tested across **20+ live servers** running OpenLiteSpeed/Nginx on Ubuntu 20/22/24, this repo bundles the scripts I actually run every day: full WordPress migrations between servers, per-app CVE scanning via the [WPVulnerability.net](https://www.wpvulnerability.net/) API, WP Security Audit, permission fixes, disk cleanup, my.cnf tuning, code freeze, batch wp-cli updates, server metrics with webhook reporting, and one-command self-update.
+
+Pairs with [`runcloud-go`](https://github.com/codetot-web/runcloud-go) — a Docker-deployed Go dashboard that wires these scripts into per-app actions across your fleet.
+
+**Why another toolkit?** RunCloud's panel covers provisioning. This covers everything *after* — the daily ops, migrations, security work, and cleanup that keeps a multi-tenant WordPress fleet healthy.
 
 Author: [@khoipro](https://github.com/khoipro), @copilot
 
