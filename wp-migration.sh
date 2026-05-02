@@ -128,7 +128,31 @@ fi
 SRC_APPNAME="${POSITIONAL[1]}"
 DEST_APPNAME="${POSITIONAL[2]:-$SRC_APPNAME}"
 
-SRC_PATH="/home/$USER/webapps/$SRC_APPNAME"
+# Resolve source user. RunCloud panel apps default to /home/runcloud/webapps,
+# but private setups may use a different system user. Auto-detect by scanning
+# /home/*/webapps/<appname>, with SRC_USER env var as override.
+if [ -n "${SRC_USER:-}" ]; then
+  SRC_PATH="/home/$SRC_USER/webapps/$SRC_APPNAME"
+else
+  shopt -s nullglob
+  SRC_CANDIDATES=(/home/*/webapps/"$SRC_APPNAME")
+  shopt -u nullglob
+
+  if [ ${#SRC_CANDIDATES[@]} -eq 0 ]; then
+    error "Webapp '$SRC_APPNAME' not found under /home/*/webapps/. Set SRC_USER=<user> if your webapps live elsewhere."
+    exit 1
+  elif [ ${#SRC_CANDIDATES[@]} -gt 1 ]; then
+    error "Multiple webapps named '$SRC_APPNAME' found:"
+    printf '  %s\n' "${SRC_CANDIDATES[@]}" >&2
+    error "Set SRC_USER=<user> to disambiguate."
+    exit 1
+  fi
+
+  SRC_PATH="${SRC_CANDIDATES[0]}"
+  SRC_USER=$(awk -F/ '{print $3}' <<<"$SRC_PATH")
+  info "Auto-detected source user: $SRC_USER"
+fi
+
 DEST_PATH="/home/$DEST_USER/webapps/$DEST_APPNAME"
 
 DATE="$(date +"%Y%m%d_%H%M%S")"
