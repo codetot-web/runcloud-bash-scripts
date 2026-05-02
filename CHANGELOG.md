@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.2] - 2026-05-02
+
+### Fixed
+
+- `wp-migration.sh`: SSH connections are now multiplexed via `ControlMaster=auto` + `ControlPersist=10m`, so password (or key passphrase) is prompted at most once per migration instead of ~8 times across the db-export, rsync, config-sync, and url-update steps (#23).
+- `wp-migration.sh`: database import errors are no longer masked. The mysql pipeline now uses `set -o pipefail` and propagates the real exit code, so connection or auth failures (e.g. `ERROR 1045 Access denied`) abort the migration with an actionable hint instead of being followed by a bogus "Database imported successfully" line (#23).
+
 ## [0.0.1.1] - 2026-05-02
 
 ### Fixed
