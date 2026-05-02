@@ -131,6 +131,23 @@ run_git() {
     fi
 }
 
+# --- Helper: abort cleanup if a stale .git/index.lock exists ---
+# A previous interrupted run can leave .git/index.lock behind. Without this
+# check, every subsequent `git commit` silently fails while the script still
+# prints [OK], so cleanup looks successful but no commits land.
+check_git_lock() {
+    local site_path="$1" webapp_name="$2"
+    local lock="$site_path/.git/index.lock"
+    if [ -e "$lock" ]; then
+        error "$webapp_name: stale lock file found at $lock"
+        error "  A previous git operation crashed. Check no git process is running, then:"
+        error "    rm -f $lock"
+        error "  Skipping $webapp_name."
+        return 1
+    fi
+    return 0
+}
+
 # --- Helper: get untracked files ---
 get_untracked() {
     local owner="$1" path="$2"
@@ -289,8 +306,12 @@ untrack_ignored_files() {
                 dry "    rm $f"
             done
         else
-            run_git "$owner" "$site_path" rm -f -- "${remove_files[@]}" 2>/dev/null || true
-            run_git "$owner" "$site_path" commit -m "chore: remove obsolete tracked files" --quiet 2>/dev/null || true
+            if ! run_git "$owner" "$site_path" rm -f -- "${remove_files[@]}" 2>/dev/null; then
+                error "  remove obsolete: git rm failed"; return 1
+            fi
+            if ! run_git "$owner" "$site_path" commit -m "chore: remove obsolete tracked files" --quiet 2>/dev/null; then
+                error "  remove obsolete: git commit failed"; return 1
+            fi
             success "  removed ${#remove_files[@]} obsolete files"
         fi
     fi
@@ -307,10 +328,14 @@ untrack_ignored_files() {
             local i=0
             while [ $i -lt ${#untrack_files[@]} ]; do
                 local batch=("${untrack_files[@]:$i:$batch_size}")
-                run_git "$owner" "$site_path" rm --cached -- "${batch[@]}" 2>/dev/null || true
+                if ! run_git "$owner" "$site_path" rm --cached -- "${batch[@]}" 2>/dev/null; then
+                    error "  untrack production: git rm --cached failed"; return 1
+                fi
                 i=$((i + batch_size))
             done
-            run_git "$owner" "$site_path" commit -m "chore: untrack production artifacts" --quiet 2>/dev/null || true
+            if ! run_git "$owner" "$site_path" commit -m "chore: untrack production artifacts" --quiet 2>/dev/null; then
+                error "  untrack production: git commit failed"; return 1
+            fi
             success "  untracked ${#untrack_files[@]} production artifacts"
         fi
     fi
@@ -557,6 +582,11 @@ cleanup_site() {
         return 0
     fi
 
+    # Bail out loudly on stale index.lock (see check_git_lock for context)
+    if [ "$DRY_RUN" != true ] && ! check_git_lock "$site_path" "$webapp_name"; then
+        return 0
+    fi
+
     local owner
     owner=$(detect_owner "$site_path")
 
@@ -714,8 +744,12 @@ update_gitignore() {
     chown "$owner:$owner" "$gitignore" 2>/dev/null || true
 
     # Commit .gitignore
-    run_git "$owner" "$site_path" add .gitignore 2>/dev/null
-    run_git "$owner" "$site_path" commit -m "chore: update .gitignore for production artifacts" --quiet 2>/dev/null || true
+    if ! run_git "$owner" "$site_path" add .gitignore 2>/dev/null; then
+        error "  .gitignore: git add failed"; return 1
+    fi
+    if ! run_git "$owner" "$site_path" commit -m "chore: update .gitignore for production artifacts" --quiet 2>/dev/null; then
+        error "  .gitignore: git commit failed"; return 1
+    fi
     success "  .gitignore updated (${#missing_patterns[@]} patterns added)"
 }
 
@@ -736,12 +770,19 @@ commit_files() {
     local i=0
     while [ $i -lt $count ]; do
         local batch=("${files[@]:$i:$batch_size}")
-        run_git "$owner" "$site_path" add -- "${batch[@]}" 2>/dev/null || true
+        if ! run_git "$owner" "$site_path" add -- "${batch[@]}" 2>/dev/null; then
+            error "  $message: git add failed"
+            return 1
+        fi
         i=$((i + batch_size))
     done
 
-    # Commit
-    run_git "$owner" "$site_path" commit -m "$message" --quiet 2>/dev/null || true
+    # Commit — exit-code-checked so a failed commit (e.g. stale lock, hook
+    # rejection) is reported instead of silently swallowed.
+    if ! run_git "$owner" "$site_path" commit -m "$message" --quiet 2>/dev/null; then
+        error "  $message: git commit failed"
+        return 1
+    fi
     success "  $message ($count files)"
 }
 
