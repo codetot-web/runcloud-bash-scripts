@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.3] - 2026-05-02
+
+### Fixed
+
+- `wp-migration.sh`: `$table_prefix` is now parsed correctly. The previous `sed "s/.*'//; s/'.*//"` was greedy and captured the trailing `;` instead of the prefix value, producing `prefix: ;` in logs and silently breaking step 6 (URL update would query `;options` and fail). Replaced with `awk -F"'"` + validation that the prefix matches `[A-Za-z0-9_]+` (#25).
+
 ## [0.0.1.2] - 2026-05-02
 
 ### Fixed

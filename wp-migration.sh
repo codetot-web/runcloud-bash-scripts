@@ -207,12 +207,25 @@ DB_USER=$(extract_wp_config "DB_USER")
 DB_PASS=$(extract_wp_config "DB_PASSWORD")
 DB_HOST=$(extract_wp_config "DB_HOST")
 
-# Read table prefix
-TABLE_PREFIX=$(grep '^\$table_prefix' "$SRC_PATH/wp-config.php" \
-  | sed "s/.*'//; s/'.*//" || echo "wp_")
+# Read table prefix. wp-config.php convention: $table_prefix = 'wp_';
+# Split the line on single-quotes and take the second field — robust across
+# whitespace variations and avoids the greedy `.*'` sed pitfall that captured
+# the trailing semicolon.
+TABLE_PREFIX=$(awk -F"'" '/^\$table_prefix[[:space:]]*=/ {print $2; exit}' "$SRC_PATH/wp-config.php")
 
 if [ -z "$DB_NAME" ] || [ -z "$DB_USER" ] || [ -z "$DB_PASS" ]; then
   error "Could not read DB credentials from wp-config.php"
+  exit 1
+fi
+
+if [ -z "$TABLE_PREFIX" ]; then
+  error "Could not parse \$table_prefix from $SRC_PATH/wp-config.php"
+  exit 1
+fi
+
+# Validate the prefix — used unquoted in SQL queries during step 6
+if ! [[ "$TABLE_PREFIX" =~ ^[A-Za-z0-9_]+$ ]]; then
+  error "Invalid table prefix: '$TABLE_PREFIX' (must match [A-Za-z0-9_]+)"
   exit 1
 fi
 
