@@ -80,8 +80,15 @@ fi
 DEST_USER="${USERHOST%@*}"
 DEST_HOST="${USERHOST#*@}"
 
-SSH_CMD="ssh -p $DEST_PORT -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
-RSYNC_SSH="ssh -p $DEST_PORT"
+# Multiplex SSH connections so the user is prompted for password (or key
+# passphrase) at most once. ControlMaster opens a control socket on the first
+# connection; subsequent ssh/rsync calls reuse it without re-authenticating.
+SSH_CTRL_DIR="$(mktemp -d "${TMPDIR:-/tmp}/wp-migration-ssh.XXXXXX")"
+trap 'rm -rf "$SSH_CTRL_DIR"' EXIT
+SSH_OPTS="-o ControlMaster=auto -o ControlPath=$SSH_CTRL_DIR/%r@%h:%p -o ControlPersist=10m"
+
+SSH_CMD="ssh $SSH_OPTS -p $DEST_PORT -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new"
+RSYNC_SSH="ssh $SSH_OPTS -p $DEST_PORT"
 
 # ============================================================
 # SSH key setup mode
@@ -244,11 +251,18 @@ rsync -az -e "$RSYNC_SSH" "$DB_FILE" "$DEST_USER@$DEST_HOST:/tmp/"
 REMOTE_DB_FILE="/tmp/$(basename "$DB_FILE")"
 
 info "Importing database on destination..."
-$SSH_CMD "$DEST_USER@$DEST_HOST" "
-  gunzip -c '$REMOTE_DB_FILE' | mysql -u '$DB_USER' -p'$DB_PASS' -h '$DB_HOST' '$DB_NAME' 2>&1 \
-    | grep -v 'Deprecated program name' || true
+if ! $SSH_CMD "$DEST_USER@$DEST_HOST" bash -s <<REMOTE
+  gunzip -c '$REMOTE_DB_FILE' | mysql -u '$DB_USER' -p'$DB_PASS' -h '$DB_HOST' '$DB_NAME' 2> >(grep -v 'Deprecated program name' >&2)
+  status=\$?
   rm -f '$REMOTE_DB_FILE'
-"
+  exit \$status
+REMOTE
+then
+  error "Database import failed on destination (see mysql error above)"
+  error "Hint: ensure DB '$DB_NAME' and user '$DB_USER' with matching password exist on $DEST_HOST"
+  rm -f "$DB_FILE"
+  exit 1
+fi
 
 rm -f "$DB_FILE"
 info "Database imported successfully"
