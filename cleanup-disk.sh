@@ -128,29 +128,39 @@ if [ "$SYSTEM_ONLY" = false ]; then
     echo ""
 fi
 
-# --- Clean system files ---
-echo "--- System ---"
+# --- Clean system / server-wide caches ---
+# When --site=NAME is given, scope this to the target site's OLS cache only
+# and skip swap, journalctl, and other sites' caches. Otherwise run the
+# full server-wide sweep.
+if [ -n "$TARGET_SITE" ]; then
+    if [ -d "$LSCACHE_DIR/$TARGET_SITE" ]; then
+        echo "--- System (scoped to $TARGET_SITE) ---"
+        clean_dir "$LSCACHE_DIR/$TARGET_SITE" "LiteSpeed external cache ($TARGET_SITE)"
+    fi
+else
+    echo "--- System ---"
 
-# LiteSpeed swap
-clean_dir "$LSWS_SWAP" "LiteSpeed swap"
+    # LiteSpeed swap
+    clean_dir "$LSWS_SWAP" "LiteSpeed swap"
 
-# LiteSpeed external caches
-if [ -d "$LSCACHE_DIR" ]; then
-    for cache_dir in "$LSCACHE_DIR"/*/; do
-        if [ -d "$cache_dir" ]; then
-            clean_dir "$cache_dir" "LiteSpeed external cache ($(basename "$cache_dir"))"
+    # LiteSpeed external caches (all sites)
+    if [ -d "$LSCACHE_DIR" ]; then
+        for cache_dir in "$LSCACHE_DIR"/*/; do
+            if [ -d "$cache_dir" ]; then
+                clean_dir "$cache_dir" "LiteSpeed external cache ($(basename "$cache_dir"))"
+            fi
+        done
+    fi
+
+    # Journal logs
+    if command -v journalctl &>/dev/null; then
+        if [ "$DRY_RUN" = true ]; then
+            local_journal_size=$(journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+[GMKT]' || echo "unknown")
+            echo "[DRY RUN] Would vacuum journal logs to $JOURNAL_MAX (current: $local_journal_size)"
+        else
+            echo "Vacuuming journal logs to $JOURNAL_MAX..."
+            journalctl --vacuum-size="$JOURNAL_MAX" 2>&1 | tail -3
         fi
-    done
-fi
-
-# Journal logs
-if command -v journalctl &>/dev/null; then
-    if [ "$DRY_RUN" = true ]; then
-        local_journal_size=$(journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+[GMKT]' || echo "unknown")
-        echo "[DRY RUN] Would vacuum journal logs to $JOURNAL_MAX (current: $local_journal_size)"
-    else
-        echo "Vacuuming journal logs to $JOURNAL_MAX..."
-        journalctl --vacuum-size="$JOURNAL_MAX" 2>&1 | tail -3
     fi
 fi
 

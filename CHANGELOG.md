@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.6] - 2026-05-08
+
+### Fixed
+
+- `cleanup-disk.sh --site=NAME` no longer runs server-wide cleanup. The system-cleanup block (LiteSpeed swap at `/tmp/lsws-rc/swap`, every site's OLS cache under `/home/runcloud/lscaches/*/`, and `journalctl --vacuum`) ran unconditionally even when scoping to a single site, so an app-level "Cleanup" action from a dashboard would prune every other site's OLS cache too. When `--site` is given the script now only touches the target site's `wp-content/cache` plus its own `/home/runcloud/lscaches/<site>/` directory; swap, journal, and other sites' caches are left alone. Whole-fleet behaviour (no flags or `--system-only`) is unchanged.
+
 ## [0.0.1.5] - 2026-05-08
 
 ### Fixed
