@@ -188,9 +188,10 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 if [ -n "$git_url" ]; then
                     git_field=",\"git_remote\":\"$git_url\""
                 fi
-                # Check for uncommitted changes (as site owner)
-                if ! sudo -u "$username" git -C "$app_path" diff --quiet 2>/dev/null || \
-                   ! sudo -u "$username" git -C "$app_path" diff --cached --quiet 2>/dev/null; then
+                # Check for any dirty state — modifications, staged changes, OR untracked files.
+                # `git status --porcelain` covers all three; the previous `git diff` pair missed
+                # untracked plugin/theme directories that had never been committed.
+                if [ -n "$(sudo -u "$username" git -C "$app_path" status --porcelain 2>/dev/null | head -1)" ]; then
                     git_field="$git_field,\"git_dirty\":true"
                 fi
             fi
