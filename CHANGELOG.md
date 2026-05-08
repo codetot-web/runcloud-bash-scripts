@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.5] - 2026-05-08
+
+### Fixed
+
+- `server-metrics.sh`: `git_dirty` detection now catches untracked files. The previous check used `git diff --quiet` plus `git diff --cached --quiet`, which only see modifications to tracked files and staged changes — newly installed plugins or theme directories that have never been committed don't show in either. Replaced with `git status --porcelain | head -1`, which covers modifications, staged changes, and untracked entries in a single call. Symptom: dashboards built on top of the JSON payload (e.g. runcloud-go) hid the "Git Cleanup" affordance even on repos with many untracked plugins.
+
 ## [0.0.1.4] - 2026-05-08
 
 ### Fixed
