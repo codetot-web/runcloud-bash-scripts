@@ -43,7 +43,6 @@
 
 set -euo pipefail
 
-WEBROOT="/home/runcloud/webapps"
 TARGET_SITE=""
 ACTION=""
 DRY_RUN=false
@@ -436,9 +435,15 @@ run_on_site() {
 }
 
 if [ -n "$TARGET_SITE" ]; then
-    SITE_PATH="$WEBROOT/$TARGET_SITE"
-    if [ ! -d "$SITE_PATH" ]; then
-        error "Site '$TARGET_SITE' not found in $WEBROOT"
+    SITE_PATH=""
+    for base in /home/runcloud/webapps /home/*/webapps; do
+        if [ -d "$base/$TARGET_SITE" ]; then
+            SITE_PATH="$base/$TARGET_SITE"
+            break
+        fi
+    done
+    if [ -z "$SITE_PATH" ]; then
+        error "Site '$TARGET_SITE' not found under /home/*/webapps/"
         exit 1
     fi
     run_on_site "$SITE_PATH"
@@ -446,7 +451,7 @@ else
     if [ "$ACTION" = "status" ]; then
         echo "=== Code Freeze Status — All Sites ==="
     fi
-    for site in "$WEBROOT"/*/; do
+    for site in /home/*/webapps/*/; do
         [ -d "$site" ] && run_on_site "$site"
     done
 fi
