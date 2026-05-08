@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Configuration
-BASE_PATH="/home/runcloud/webapps"
-
 # Parse arguments
 for i in "$@"; do
   case $i in
@@ -19,10 +16,17 @@ if [ -z "$SITE_NAME" ]; then
     exit 1
 fi
 
-FULL_PATH="$BASE_PATH/$SITE_NAME"
+# Resolve site path across /home/*/webapps (panel user 'runcloud' or custom system user).
+FULL_PATH=""
+for base in /home/runcloud/webapps /home/*/webapps; do
+    if [ -d "$base/$SITE_NAME" ]; then
+        FULL_PATH="$base/$SITE_NAME"
+        break
+    fi
+done
 
-if [ ! -d "$FULL_PATH" ]; then
-    echo -e "\033[1;31mError: Directory $FULL_PATH not found.\033[0m"
+if [ -z "$FULL_PATH" ]; then
+    echo -e "\033[1;31mError: Site '$SITE_NAME' not found under /home/*/webapps/.\033[0m"
     exit 1
 fi
 

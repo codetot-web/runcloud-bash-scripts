@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.4] - 2026-05-08
+
+### Fixed
+
+- Six scripts hardcoded `WEBROOT="/home/runcloud/webapps"`, so they silently failed on servers where webapps live under a custom system user (path layout `/home/<user>/webapps/<app>`). All now resolve the site path across `/home/runcloud/webapps` first, then `/home/*/webapps`, mirroring the pattern already used in `wp-plugin-push.sh`. Affected: `wp-update.sh`, `cleanup-disk.sh`, `wp-freeze.sh`, `fix-permission.sh`, `fix-permission-site.sh`, `debug-wp-cli.sh`.
+- `fix-permission.sh` and `fix-permission-site.sh` no longer hardcode `chown runcloud:runcloud`. The owner of each web app is now read from the directory itself (`stat -c '%U:%G'`) before chowning, so files keep the correct owner on multi-tenant servers instead of being clobbered to `runcloud`.
+
 ## [0.0.1.3] - 2026-05-02
 
 ### Fixed

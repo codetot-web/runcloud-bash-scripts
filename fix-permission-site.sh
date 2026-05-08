@@ -10,7 +10,6 @@
 #   - wp-content/uploads/   (user-uploaded media, may have varying permissions)
 #
 
-WEBROOT="/home/runcloud/webapps"
 TARGET_SITE=""
 
 for i in "$@"; do
@@ -21,23 +20,27 @@ for i in "$@"; do
     esac
 done
 
-# fix_permissions: sets ownership to runcloud:runcloud everywhere,
-# then sets dirs to 755 and files to 644 — excluding wp-content/uploads/
-# which contains user-uploaded media and requires manual review.
+# fix_permissions: sets ownership to the site's actual owner (panel user 'runcloud'
+# or a custom system user), then sets dirs to 755 and files to 644 — excluding
+# wp-content/uploads/ which contains user-uploaded media and requires manual review.
 #
 # Uses `find -exec {} +` to batch paths per chmod call (fast),
 # instead of `find -exec {} \;` (one subprocess per file — very slow).
 fix_permissions() {
     local dir=$1
     local uploads_dir="$dir/wp-content/uploads"
+    local site_owner site_group
+    site_owner=$(stat -c '%U' "$dir" 2>/dev/null || echo runcloud)
+    [ "$site_owner" = "root" ] && site_owner="runcloud"
+    site_group=$(stat -c '%G' "$dir" 2>/dev/null || echo "$site_owner")
 
-    echo "Processing $dir ..."
+    echo "Processing $dir (owner: $site_owner:$site_group) ..."
 
-    # 1. Fix ownership — only if any file is not owned by runcloud (skip if already correct)
-    wrong_owner=$(sudo find "$dir" -not -user runcloud -not -group runcloud 2>/dev/null | head -1)
+    # 1. Fix ownership — only if any file is not owned by the site owner (skip if already correct)
+    wrong_owner=$(sudo find "$dir" -not -user "$site_owner" -not -group "$site_group" 2>/dev/null | head -1)
     if [ -n "$wrong_owner" ]; then
         echo "  Fixing ownership..."
-        sudo chown -R runcloud:runcloud "$dir" || echo "Warning: chown failed for $dir"
+        sudo chown -R "$site_owner:$site_group" "$dir" || echo "Warning: chown failed for $dir"
     else
         echo "  Ownership OK — skipping chown"
     fi
@@ -60,15 +63,21 @@ fix_permissions() {
 }
 
 if [ -n "$TARGET_SITE" ]; then
-    SITE_PATH="$WEBROOT/$TARGET_SITE"
-    if [ -d "$SITE_PATH" ]; then
+    SITE_PATH=""
+    for base in /home/runcloud/webapps /home/*/webapps; do
+        if [ -d "$base/$TARGET_SITE" ]; then
+            SITE_PATH="$base/$TARGET_SITE"
+            break
+        fi
+    done
+    if [ -n "$SITE_PATH" ]; then
         fix_permissions "$SITE_PATH"
     else
-        echo "Error: Site '$TARGET_SITE' not found in $WEBROOT"
+        echo "Error: Site '$TARGET_SITE' not found under /home/*/webapps/"
         exit 1
     fi
 else
-    for site in "$WEBROOT"/*/; do
+    for site in /home/*/webapps/*/; do
         [ -d "$site" ] && fix_permissions "$site"
     done
 fi

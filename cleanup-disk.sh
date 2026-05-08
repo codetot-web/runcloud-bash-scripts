@@ -29,7 +29,6 @@
 
 set -euo pipefail
 
-WEBROOT="/home/runcloud/webapps"
 LSCACHE_DIR="/home/runcloud/lscaches"
 LSWS_SWAP="/tmp/lsws-rc/swap"
 JOURNAL_MAX="500M"
@@ -108,18 +107,22 @@ if [ "$SYSTEM_ONLY" = false ]; then
     }
 
     if [ -n "$TARGET_SITE" ]; then
-        SITE_PATH="$WEBROOT/$TARGET_SITE"
-        if [ -d "$SITE_PATH" ]; then
+        SITE_PATH=""
+        for base in /home/runcloud/webapps /home/*/webapps; do
+            if [ -d "$base/$TARGET_SITE" ]; then
+                SITE_PATH="$base/$TARGET_SITE"
+                break
+            fi
+        done
+        if [ -n "$SITE_PATH" ]; then
             clean_app "$SITE_PATH"
         else
-            echo "Error: Site '$TARGET_SITE' not found in $WEBROOT"
+            echo "Error: Site '$TARGET_SITE' not found under /home/*/webapps/"
             exit 1
         fi
     else
-        for site in "$WEBROOT"/*/; do
-            if [ -d "$site" ]; then
-                clean_app "$site"
-            fi
+        for site in /home/*/webapps/*/; do
+            [ -d "$site" ] && clean_app "$site"
         done
     fi
     echo ""

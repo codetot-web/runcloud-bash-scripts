@@ -15,7 +15,7 @@
 #   ./wp-update.sh --site=APPNAME --action=status                     # show pending updates
 #
 # Options:
-#   --site=NAME          Required. Web app name under /home/runcloud/webapps/
+#   --site=NAME          Required. Web app name (resolved across /home/*/webapps/)
 #   --action=ACTION      Required. One of: plugins, themes, core, all, status
 #   --exclude=LIST       Comma-separated plugin slugs to skip (only for plugins action)
 #   --exclude-themes=LIST  Comma-separated theme slugs to skip (only for themes action)
@@ -26,7 +26,6 @@
 
 set -euo pipefail
 
-WEBROOT="/home/runcloud/webapps"
 SITE=""
 ACTION=""
 EXCLUDE=""
@@ -82,11 +81,20 @@ if [ -z "$SITE" ] || [ -z "$ACTION" ]; then
     exit 1
 fi
 
-SITE_PATH="$WEBROOT/$SITE"
-if [ ! -d "$SITE_PATH" ]; then
-    error "Site '$SITE' not found at $SITE_PATH"
+# Resolve site path. RunCloud may host webapps under the panel user 'runcloud'
+# (/home/runcloud/webapps/) or under a custom system user (/home/<user>/webapps/).
+SITE_PATH=""
+for base in /home/runcloud/webapps /home/*/webapps; do
+    if [ -d "$base/$SITE" ]; then
+        SITE_PATH="$base/$SITE"
+        break
+    fi
+done
+if [ -z "$SITE_PATH" ]; then
+    error "Site '$SITE' not found under /home/*/webapps/"
     exit 1
 fi
+info "Site path: $SITE_PATH"
 
 if [ ! -f "$SITE_PATH/wp-config.php" ]; then
     error "'$SITE' is not a WordPress site (no wp-config.php)"
