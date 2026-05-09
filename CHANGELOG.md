@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.7] - 2026-05-09
+
+### Added
+
+- `laravel-migration.sh`: full Laravel migration between RunCloud servers. Mirrors `wp-migration.sh` patterns (SSH multiplex, `--setup-ssh`, `--staging-url`, source-creds-on-dest DB import) but reads `.env`, syncs `storage/app` + `public/build`, and runs `composer install` + `artisan optimize` + `migrate --force` on the destination. Auto-detects the webapp's PHP version by parsing `path /usr/local/lsws/lsphpXX/bin/lsphp` from `/etc/lsws-rc/conf.d/<app>.d/handler.conf` so composer/artisan run with the correct CLI binary instead of the system `/usr/bin/php` (which is often older than what the app's composer.lock requires). Caller can override via `PHP_BINARY` env var. Also drops a root `.htaccess` rewriting `/` → `public/` so LSWS serves the Laravel front controller — current RunCloud panel doesn't expose the "Public Path" setting that older versions had, so without this `.htaccess` newly-created Laravel webapps return 404 at `/`. Flags: `--skip-composer`, `--skip-build`, `--skip-storage`, `--skip-migrate`. Tested on codetot-portal jp1 → sg4 migration.
+
 ## [0.0.1.6] - 2026-05-08
 
 ### Fixed

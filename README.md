@@ -4,7 +4,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 
 ## Features
 - [x] Install ioncube for all PHP versions
-- [x] Migrate web application between RunCloud servers
+- [x] Migrate WordPress and Laravel apps between RunCloud servers
 - [x] Fix web applications permission (runcloud chown, file 644 folder 755)
 - [x] Disk space cleanup (LiteSpeed cache, swap, journal logs)
 - [x] Change SSH port
@@ -92,6 +92,54 @@ Full WordPress migration between RunCloud servers. Handles database, config file
 # 2. Run migration with staging URL
 ./wp-migration.sh runcloud@sg3.codetot.org myapp --staging-url=http://myapp.staging.temp-site.link
 ```
+
+### laravel-migration.sh
+
+Full Laravel migration between RunCloud servers. Mirrors `wp-migration.sh` but for Laravel apps — reads `.env`, syncs storage + build assets, runs `composer install` and artisan optimize on the destination.
+
+**What it does:**
+1. Exports database (mysqldump, reads creds from `.env`)
+2. Transfers and imports database on destination
+3. Syncs `.env` (with optional `APP_URL` override for staging)
+4. Syncs `storage/app/` and `public/build/`
+5. Initializes git submodules
+6. Auto-detects the webapp's PHP version from `/etc/lsws-rc/conf.d/<app>.d/handler.conf` and runs:
+   - `composer install --no-dev --optimize-autoloader`
+   - `php artisan storage:link`, `config:cache`, `route:cache`, `view:cache`
+   - `php artisan migrate --force` (skip with `--skip-migrate`)
+
+**Prerequisites:**
+- SSH key auth from source to destination
+- DB and user must exist on destination with **same name/user** as source — align password via:
+  ```sql
+  ALTER USER 'app_user'@'%' IDENTIFIED BY '<source_password>';
+  FLUSH PRIVILEGES;
+  ```
+- **RunCloud panel: set Public Path = `/public`** for the destination webapp (else LSWS returns 404)
+
+**Examples:**
+
+```bash
+# Setup SSH (one-time)
+./laravel-migration.sh runcloud@sg4.codetot.org --setup-ssh
+
+# Migrate with staging URL override
+./laravel-migration.sh runcloud@sg4.codetot.org myapp \
+  --staging-url=http://myapp.staging.temp-site.link
+
+# Skip composer (e.g. vendor was already rsynced)
+./laravel-migration.sh runcloud@sg4.codetot.org myapp --skip-composer
+
+# Skip migrations (don't run `php artisan migrate`)
+./laravel-migration.sh runcloud@sg4.codetot.org myapp --skip-migrate
+```
+
+**Flags:**
+- `--staging-url=URL` — rewrite `APP_URL` in destination `.env`
+- `--skip-composer` — skip `composer install`
+- `--skip-build` — skip syncing `public/build/`
+- `--skip-storage` — skip syncing `storage/app/`
+- `--skip-migrate` — skip `php artisan migrate --force`
 
 ### fix-permission.sh / fix-permission-site.sh
 
