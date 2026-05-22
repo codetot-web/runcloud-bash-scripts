@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.0.1.8] - 2026-05-22
+
+### Fixed
+
+- `wp-freeze.sh`: mu-plugins directory now stays readable by the web user after freeze. RunCloud sets ACL `group:users-rc:---` on wp-content subdirectories; when `freeze_permissions()` set mu-plugins to 555 and the directory was owned by root, the ACL blocked the runcloud user from listing it, causing a WordPress fatal error on every page load ("There has been a critical error on your website"). New `ensure_muplugins_accessible()` function chowns mu-plugins to the detected web user after the freeze, so owner permissions override the restrictive group ACL.
+
+### Changed
+
+- `wp-freeze.sh`: `find -exec chmod` calls changed from `\;` to `+` for better performance on large file trees.
+
 ## [0.0.1.7] - 2026-05-09
 
 ### Added
