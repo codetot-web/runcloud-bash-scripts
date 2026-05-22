@@ -249,6 +249,40 @@ remove_uploads_htaccess_block() {
     fi
 }
 
+ensure_muplugins_accessible() {
+    # Fixes mu-plugins accessibility after freeze_permissions() chmod 555.
+    # RunCloud sets ACL 'group:users-rc:---' on wp-content subdirs, which
+    # blocks the web user (runcloud) from reading mu-plugins when owned by root.
+    # Chowning mu-plugins to the web user ensures owner perms override the ACL.
+    local site_path="$1"
+    local muplugins_dir="$site_path/wp-content/mu-plugins"
+    local web_user
+
+    [ ! -d "$muplugins_dir" ] && return
+
+    # Detect web user: RunCloud uses 'runcloud', fallback to 'www-data'
+    if id runcloud &>/dev/null; then
+        web_user="runcloud"
+    else
+        web_user="www-data"
+    fi
+
+    if [ "$DRY_RUN" = true ]; then
+        dry "Would ensure $muplugins_dir is readable by $web_user"
+        return
+    fi
+
+    chown "$web_user:$web_user" "$muplugins_dir"
+    chmod 755 "$muplugins_dir"
+
+    # Verify: can the web user actually list this directory?
+    if sudo -u "$web_user" ls "$muplugins_dir" &>/dev/null; then
+        success "mu-plugins/ accessible by $web_user"
+    else
+        error "mu-plugins/ still inaccessible by $web_user — manual fix required"
+    fi
+}
+
 deploy_muplugin() {
     local site_path="$1"
     local muplugins_dir="$site_path/wp-content/mu-plugins"
@@ -295,12 +329,12 @@ freeze_permissions() {
     find "$site_path" \
         -not \( -path "$site_path/wp-content/uploads" -prune \) \
         -not \( -path "$site_path/wp-content/uploads/*" -prune \) \
-        -type d -exec chmod 555 {} \;
+        -type d -exec chmod 555 {} +
 
     find "$site_path" \
         -not \( -path "$site_path/wp-content/uploads" -prune \) \
         -not \( -path "$site_path/wp-content/uploads/*" -prune \) \
-        -type f -exec chmod 444 {} \;
+        -type f -exec chmod 444 {} +
 
     # wp-config.php: owner+group read only, no others
     [ -f "$site_path/wp-config.php" ] && chmod 440 "$site_path/wp-config.php"
@@ -317,15 +351,15 @@ restore_permissions() {
         return
     fi
 
-    find "$site_path" -type d -exec chmod 755 {} \;
-    find "$site_path" -type f -exec chmod 644 {} \;
+    find "$site_path" -type d -exec chmod 755 {} +
+    find "$site_path" -type f -exec chmod 644 {} +
 
     [ -f "$site_path/wp-config.php" ] && chmod 640 "$site_path/wp-config.php"
 
     # Ensure uploads stays writable by web process
     [ -d "$site_path/wp-content/uploads" ] && \
-        find "$site_path/wp-content/uploads" -type d -exec chmod 755 {} \; && \
-        find "$site_path/wp-content/uploads" -type f -exec chmod 644 {} \;
+        find "$site_path/wp-content/uploads" -type d -exec chmod 755 {} + && \
+        find "$site_path/wp-content/uploads" -type f -exec chmod 644 {} +
 
     success "Restored filesystem permissions (644/755)"
 }
@@ -361,6 +395,9 @@ do_freeze() {
 
     # 4. Freeze filesystem permissions (last — locks everything including the mu-plugin)
     freeze_permissions "$site_path"
+
+    # 5. Ensure mu-plugins remains readable by web user (RunCloud ACL workaround)
+    ensure_muplugins_accessible "$site_path"
 
     success "$app_name: FROZEN"
 }
