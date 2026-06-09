@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [0.0.1.8] - 2026-05-22
 
+### Added
+
+- `chown-site.sh`: recursively chown a RunCloud webapp tree to `www-data:www-data` while excluding `wp-content/uploads`. The script defaults to the `runcloud` system user if `--user` is omitted, and accepts overrides like `--user=ubuntu` for sites hosted under a custom webapp owner.
+
 ### Fixed
 
 - `wp-freeze.sh`: mu-plugins directory now stays readable by the web user after freeze. RunCloud sets ACL `group:users-rc:---` on wp-content subdirectories; when `freeze_permissions()` set mu-plugins to 555 and the directory was owned by root, the ACL blocked the runcloud user from listing it, causing a WordPress fatal error on every page load ("There has been a critical error on your website"). New `ensure_muplugins_accessible()` function chowns mu-plugins to the detected web user after the freeze, so owner permissions override the restrictive group ACL.

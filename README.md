@@ -6,6 +6,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Install ioncube for all PHP versions
 - [x] Migrate WordPress and Laravel apps between RunCloud servers
 - [x] Fix web applications permission (runcloud chown, file 644 folder 755)
+- [x] Chown a webapp tree to www-data while preserving wp-content/uploads
 - [x] Disk space cleanup (LiteSpeed cache, swap, journal logs)
 - [x] Change SSH port
 - [x] Debug WP-CLI issues
@@ -44,7 +45,7 @@ Full WordPress migration between RunCloud servers. Handles database, config file
 1. Exports database (wp-cli or mysqldump with corrupted table handling)
 2. Transfers and imports database on destination
 3. Syncs wp-config.php, .htaccess, .htninja
-4. Syncs wp-content/uploads
+4. Syncs wp-content/uploads and normalizes file permissions for web serving
 5. Initializes git submodules on destination
 6. Optionally updates site URL for staging (search-replace)
 
@@ -92,6 +93,45 @@ Full WordPress migration between RunCloud servers. Handles database, config file
 # 2. Run migration with staging URL
 ./wp-migration.sh runcloud@sg3.codetot.org myapp --staging-url=http://myapp.staging.temp-site.link
 ```
+
+### wp-local-to-production.sh
+
+Sync a local WordPress site on this Mac to a RunCloud production webapp.
+
+**What it does:**
+1. Exports the local database from the source site on your Mac
+2. Transfers and imports the database into the destination RunCloud webapp
+3. Syncs `wp-content/uploads` and normalizes file permissions for web serving
+4. Syncs `.htaccess` and `.htninja` when present
+5. Runs a production URL search-replace on the destination
+6. Normalizes upload file permissions to `644` and directories to `755` on the destination
+
+**Prerequisites:**
+- SSH access to the destination RunCloud server
+- Destination webapp and database already created in RunCloud
+- Local site path points at the WordPress `public` directory
+
+**Examples:**
+
+```bash
+./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" \
+  --production-url=http://cdev.example.temp-site.link
+
+./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" cdev \
+  --production-url=http://cdev.example.temp-site.link
+
+./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" cdev \
+  --dry-run --production-url=http://cdev.example.temp-site.link
+```
+
+**Flags:**
+- `--production-url=URL` — required, destination URL used for search-replace
+- `--setup-ssh` — add your Mac SSH public key to the destination server
+- `--dry-run` — print the planned steps without exporting, importing, or syncing anything
+- `--skip-uploads` — skip syncing `wp-content/uploads`
+- `--skip-search-replace` — skip URL replacement on the destination
+- `--skip-htaccess` — skip syncing `.htaccess` / `.htninja`
+- `--skip-submodules` — skip `git submodule update --init --recursive`
 
 ### laravel-migration.sh
 
@@ -149,6 +189,26 @@ Fix file ownership and permissions for RunCloud web applications.
 ./fix-permission.sh
 ./fix-permission-site.sh myapp
 ```
+
+### chown-site.sh
+
+Recursively chown a RunCloud webapp tree to `www-data:www-data` while skipping `wp-content/uploads`.
+
+**What it does:**
+1. Resolves the site under `/home/<user>/webapps/<site>`
+2. Recursively chowns the site tree to `www-data:www-data`
+3. Excludes `wp-content/uploads` so uploaded media keeps its own permissions
+
+**Examples:**
+
+```bash
+./chown-site.sh --site=meatdeli
+./chown-site.sh --site=meatdeli --user=ubuntu
+```
+
+**Flags:**
+- `--site=NAME` — required webapp name
+- `--user=NAME` — optional system user; defaults to `runcloud`
 
 ### install-ioncube.sh
 
