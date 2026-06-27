@@ -193,17 +193,35 @@ for SCANPATH in $SCANPATHS; do
     done
   fi
 
-  # 7. Unusual .php files in wp-includes (not part of core)
+  # 7. WP core file integrity check (use wp core verify-checksums — authoritative)
   echo ""
-  echo "[Unauthorized files in wp-includes]"
-  if [ -d "$SCANPATH/wp-includes" ]; then
-    unexpected_wpinc=$(find "$SCANPATH/wp-includes" -maxdepth 1 -name "*.php" ! -name "*.php" 2>/dev/null | head -20)
-    # Actually find files that shouldn't be at wp-includes root level
-    unexpected_wpinc=$(find "$SCANPATH/wp-includes" -maxdepth 1 -type f \( -name "*.php" -o -name "*.txt" -o -name "*.html" \) ! -name "class-wp-*" ! -name "wp-*" ! -name "rest-api" ! -name ".*" 2>/dev/null | head -20)
-    if [ -n "$unexpected_wpinc" ]; then
-      yellow "[MEDIUM] Unusual files in wp-includes/:"
-      echo "$unexpected_wpinc"
-      ISSUES=$((ISSUES+1))
+  echo "[WP Core Integrity Check]"
+  if [ -d "$SCANPATH/wp-includes" ] && [ -f "$SCANPATH/wp-config.php" ]; then
+    WP_CLI=""
+    for p in /usr/local/bin/wp /usr/bin/wp; do
+      [ -x "$p" ] && WP_CLI="$p" && break
+    done
+
+    if [ -n "$WP_CLI" ]; then
+      SITE_OWNER=$(stat -c '%U' "$SCANPATH/wp-config.php" 2>/dev/null || stat -f '%Su' "$SCANPATH/wp-config.php" 2>/dev/null)
+      echo "[+] Running wp core verify-checksums..."
+      verify_output=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$SCANPATH" core verify-checksums 2>&1)
+      if [ $? -ne 0 ] || echo "$verify_output" | head -1 | grep -qi "Error"; then
+        red "[HIGH] WP core checksum mismatch — files may be modified or compromised:"
+        echo "$verify_output" | head -30
+        ISSUES=$((ISSUES+1))
+      else
+        green "[OK] All core files match expected checksums"
+      fi
+    else
+      # Fallback: check for non-standard .txt/.html files at wp-includes root
+      # (PHP files are too numerous to filter reliably by name)
+      unexpected_wpinc=$(find "$SCANPATH/wp-includes" -maxdepth 1 -type f \( -name "*.txt" -o -name "*.html" \) ! -name "index.html" 2>/dev/null)
+      if [ -n "$unexpected_wpinc" ]; then
+        yellow "[MEDIUM] Unexpected .txt/.html files in wp-includes/:"
+        echo "$unexpected_wpinc"
+        ISSUES=$((ISSUES+1))
+      fi
     fi
   fi
 
