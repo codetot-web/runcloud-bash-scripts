@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `wp-security-audit.sh`: Phase 1 fast malware pattern detection (before heavy ClamAV scan):
+  - Known PHP shells: goods.php, shop.php at webapp root
+  - Tiny File Manager: .tmb/*.php directory check
+  - Backdoor block: wp-includes/blocks/ZEa/ directory
+  - Cookie auth bypass: wp-login.php yrxc_uck backdoor
+  - Obfuscated PHP: large single-line files (>50KB, <5 lines)
+  - Suspicious root-level PHP files with eval/system/exec/base64_decode
+  - Unusual files in wp-includes/ (non-core .php/.txt/.html)
+  - Suspicious cron hooks via wp-cli option get (when wp-cli available)
+  - Dependencies now optional (warn instead of exit 1) — Phase 1 runs without clamav/rkhunter
+  - Summary score per-site: colored output (red/green) with issue count
+  - `--install-deps` flag for one-command setup of clamav+rkhunter+chkrootkit
+
 ## [0.0.1.8] - 2026-05-22
 
 ### Added
