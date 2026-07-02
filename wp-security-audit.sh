@@ -225,6 +225,39 @@ for SCANPATH in $SCANPATHS; do
     fi
   fi
 
+  # 7.5. Custom CODE TOT patterns (discovered during fleet audits)
+  echo ""
+  echo "[CODE TOT Custom Patterns]"
+
+  # Advanced LinkFlow Control backdoor (fake plugin)
+  check_file_exists "Backdoor: Advanced LinkFlow Control" "$SCANPATH/wp-content/plugins/*/advanced-linkflow-control.php" "CRITICAL" && ISSUES=$((ISSUES+1))
+
+  # Known webshell filenames in uploads
+  for shell in linc.php chrome.php 500.php up.php filem2.php batch.php bb9dfeb7820fe02990c7964f2ac2073a.php gi-1-64x36.jpg.php; do
+    found=$(find "$SCANPATH/wp-content/uploads" -name "$shell" -type f 2>/dev/null)
+    if [ -n "$found" ]; then
+      red "[CRITICAL] Known webshell (${shell}) found:"
+      echo "$found" | while read -r f; do echo "         $f"; done
+      ISSUES=$((ISSUES+1))
+    fi
+  done
+
+  # Generic webshell check in uploads (PHP files not named index.php)
+  php_in_uploads=$(find "$SCANPATH/wp-content/uploads" -name "*.php" ! -name "index.php" -type f 2>/dev/null)
+  if [ -n "$php_in_uploads" ]; then
+    yellow "[HIGH] Suspicious PHP files in uploads directory:"
+    echo "$php_in_uploads" | while read -r f; do echo "         $f"; done
+    ISSUES=$((ISSUES+1))
+  fi
+
+  # C2 domain reference in code
+  c2_check=$(grep -rl "securitystats.top" "$SCANPATH/wp-content" 2>/dev/null || true)
+  if [ -n "$c2_check" ]; then
+    red "[CRITICAL] C2 domain (securitystats.top) referenced in files:"
+    echo "$c2_check" | while read -r f; do echo "         $f"; done
+    ISSUES=$((ISSUES+1))
+  fi
+
   # 8. Suspicious cron entries / wp_options backdoor
   echo ""
   echo "[Suspicious cron entries]"

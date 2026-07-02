@@ -237,7 +237,7 @@ echo ""
 # ============================================================
 # Step 1: Export database
 # ============================================================
-info "Step 1/6: Exporting database..."
+info "Step 1/7: Exporting database..."
 if command -v wp &>/dev/null && wp core is-installed --path="$SRC_PATH" 2>/dev/null; then
   wp db export --path="$SRC_PATH" - | gzip > "$DB_FILE"
 else
@@ -258,7 +258,7 @@ info "Database exported: $DB_FILE ($DB_SIZE)"
 # ============================================================
 # Step 2: Transfer and import database
 # ============================================================
-info "Step 2/6: Transferring database to destination..."
+info "Step 2/7: Transferring database to destination..."
 rsync -az -e "$RSYNC_SSH" "$DB_FILE" "$DEST_USER@$DEST_HOST:/tmp/"
 
 REMOTE_DB_FILE="/tmp/$(basename "$DB_FILE")"
@@ -281,9 +281,54 @@ rm -f "$DB_FILE"
 info "Database imported successfully"
 
 # ============================================================
+# Step 2b: Clean up legacy staging URLs
+# Replaces any *.temp-site.link remnants from prior migrations
+# with the source production URL, so step 7's search-replace
+# catches them cleanly if a --staging-url is provided.
+# ============================================================
+info "Step 2b: Checking for legacy staging URLs..."
+
+LEGACY_HITS=$($SSH_CMD "$DEST_USER@$DEST_HOST" "
+  mysql -u '$DB_USER' -p'$DB_PASS' -h '$DB_HOST' '$DB_NAME' -N 2>/dev/null \
+    -e \"SELECT IFNULL(SUM(c),0) FROM (
+      SELECT COUNT(*) c FROM ${TABLE_PREFIX}posts WHERE post_content LIKE '%.temp-site.link%'
+      UNION ALL
+      SELECT COUNT(*) c FROM ${TABLE_PREFIX}options WHERE option_value LIKE '%.temp-site.link%'
+      UNION ALL
+      SELECT COUNT(*) c FROM ${TABLE_PREFIX}postmeta WHERE meta_value LIKE '%.temp-site.link%'
+    ) t;\"
+" 2>/dev/null || echo 0)
+
+if [ "${LEGACY_HITS:-0}" -gt 0 ]; then
+  warn "Found $LEGACY_HITS legacy temp-site.link reference(s) — replacing with source URL..."
+
+  SRC_PROD_URL=$($SSH_CMD "$DEST_USER@$DEST_HOST" "
+    mysql -u '$DB_USER' -p'$DB_PASS' -h '$DB_HOST' '$DB_NAME' -N 2>/dev/null \
+      -e \"SELECT option_value FROM ${TABLE_PREFIX}options WHERE option_name='siteurl' LIMIT 1;\"
+  " 2>/dev/null)
+
+  if [ -n "$SRC_PROD_URL" ]; then
+    $SSH_CMD "$DEST_USER@$DEST_HOST" "
+      if command -v wp &>/dev/null; then
+        wp search-replace 'https?://[^ \"'\''>]+\.temp-site\.link[^ \"'\''>]*' \
+          '$SRC_PROD_URL' \
+          --regex --skip-columns=guid --all-tables \
+          --path='$DEST_PATH' 2>&1 | tail -1
+      else
+        echo 'wp-cli not available — legacy URLs left in place'
+      fi
+    "
+  else
+    warn "Could not read siteurl from DB — skipping legacy URL cleanup"
+  fi
+else
+  info "No legacy staging URLs found"
+fi
+
+# ============================================================
 # Step 3: Sync config files
 # ============================================================
-info "Step 3/6: Syncing config files..."
+info "Step 3/7: Syncing config files..."
 
 rsync -az -e "$RSYNC_SSH" "$SRC_PATH/wp-config.php" \
   "$DEST_USER@$DEST_HOST:$DEST_PATH/"
@@ -306,18 +351,18 @@ fi
 # ============================================================
 if [ -d "$SRC_PATH/wp-content/uploads" ]; then
   UPLOADS_SIZE=$(du -sh "$SRC_PATH/wp-content/uploads/" 2>/dev/null | cut -f1)
-  info "Step 4/6: Syncing uploads ($UPLOADS_SIZE)... this may take a while"
+  info "Step 4/7: Syncing uploads ($UPLOADS_SIZE)... this may take a while"
   rsync -az -e "$RSYNC_SSH" "$SRC_PATH/wp-content/uploads/" \
     "$DEST_USER@$DEST_HOST:$DEST_PATH/wp-content/uploads/"
   info "Uploads synced"
 else
-  info "Step 4/6: No uploads directory found, skipping"
+  info "Step 4/7: No uploads directory found, skipping"
 fi
 
 # ============================================================
 # Step 5: Git submodules
 # ============================================================
-info "Step 5/6: Initializing git submodules on destination..."
+info "Step 5/7: Initializing git submodules on destination..."
 $SSH_CMD "$DEST_USER@$DEST_HOST" "
   cd '$DEST_PATH'
   if [ -f .gitmodules ]; then
@@ -329,10 +374,10 @@ $SSH_CMD "$DEST_USER@$DEST_HOST" "
 "
 
 # ============================================================
-# Step 6: Update site URL (optional)
+# Step 7: Update site URL (optional)
 # ============================================================
 if [ -n "$STAGING_URL" ]; then
-  info "Step 6/6: Updating site URL to $STAGING_URL..."
+  info "Step 7/7: Updating site URL to $STAGING_URL..."
 
   # Get current URL from database on destination
   CURRENT_URL=$($SSH_CMD "$DEST_USER@$DEST_HOST" "
@@ -361,7 +406,7 @@ if [ -n "$STAGING_URL" ]; then
     warn "Could not read current URL from database"
   fi
 else
-  info "Step 6/6: No staging URL provided, skipping URL update"
+  info "Step 7/7: No staging URL provided, skipping URL update"
 fi
 
 # ============================================================
