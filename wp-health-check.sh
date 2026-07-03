@@ -142,6 +142,83 @@ if [ "$DRY_RUN" -eq 1 ]; then
     exit 0
 fi
 
-# Real probe added in next task.
-error "probe loop not yet implemented — run with --dry-run"
-exit 2
+# --- Probe each site ---
+ANY_FAIL=0
+declare -a OUTPUT_LINES=()
+
+for path in "${TARGETS[@]}"; do
+    name=$(basename "$path")
+    status="ok"
+    error_excerpt=""
+
+    # Detect FPM PHP version
+    php_ver="-"
+    if det=$(detect_fpm_php "$path" "$name"); then
+        php_ver=$(echo "$det" | cut -f1)
+    fi
+
+    # Find site owner
+    if [ -f "$path/wp-config.php" ]; then
+        SITE_OWNER=$(stat -c '%U' "$path/wp-config.php" 2>/dev/null || stat -f '%Su' "$path/wp-config.php" 2>/dev/null || echo "root")
+    else
+        SITE_OWNER="root"
+    fi
+
+    if [ -z "$SITE_OWNER" ] || [ "$SITE_OWNER" = "root" ]; then
+        info "Skipping $name (no site owner detected)"
+        continue
+    fi
+
+    # Health probe: wp eval + db check
+    probe_output=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" --skip-plugins --skip-themes eval 'echo "WP_PROBE_OK";' 2>&1) || true
+
+    if echo "$probe_output" | grep -q "WP_PROBE_OK"; then
+        # wp-cli works with bare WP — now check plugins/themes active
+        full_probe=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" eval '
+            echo "DB_OK:";
+            global $wpdb;
+            echo $wpdb->check_database_version() ? "versions_ok" : "version_mismatch";
+            echo "|";
+            echo function_exists("is_blog_installed") && is_blog_installed() ? "installed" : "not_installed";
+        ' 2>&1) || true
+
+        if echo "$full_probe" | grep -qi "error\|fatal\|exception\|could not\|connection refused\|Access denied\|Unknown database"; then
+            status="fail"
+            error_excerpt=$(echo "$full_probe" | grep -i "error\|fatal\|exception\|could not\|connection refused\|Access denied\|Unknown database" | head -3 | tr '\n' ' ')
+            ANY_FAIL=1
+        fi
+
+        # Check plugin/theme fatals by loading with plugins
+        plugin_probe=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" --skip-themes plugin list --format=csv 2>&1 | head -1) || true
+        if echo "$plugin_probe" | grep -qi "error\|fatal\|Fatal"; then
+            status="fail"
+            error_excerpt="$error_excerpt PluginList: $(echo "$plugin_probe" | head -1)"
+            ANY_FAIL=1
+        fi
+    else
+        # wp-cli itself failed
+        status="fail"
+        error_excerpt=$(echo "$probe_output" | head -3 | tr '\n' ' ')
+        ANY_FAIL=1
+    fi
+
+    # Collect output
+    FAIL_MARKER=""
+    [ "$status" = "fail" ] && FAIL_MARKER=" (FAIL)" && info "${RED}${name}${NC}: DB/plugin probe failed — ${error_excerpt}"
+
+    case "$FORMAT" in
+        tsv)
+            echo -e "${name}\t${php_ver}\t${status}\t${error_excerpt}"
+            ;;
+        json)
+            OUTPUT_LINES+=("{\"site\":\"$name\",\"php\":\"$php_ver\",\"status\":\"$status\",\"error\":$(echo "$error_excerpt" | jq -Rs .)}")
+            ;;
+    esac
+done
+
+# JSON final output if requested
+if [ "$FORMAT" = "json" ] && [ ${#OUTPUT_LINES[@]} -gt 0 ]; then
+    echo "[$(IFS=,; echo "${OUTPUT_LINES[*]}")]"
+fi
+
+exit $ANY_FAIL
