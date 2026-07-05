@@ -19,6 +19,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] Self-update (auto-pull latest from GitHub)
 - [x] WordPress code freeze (lock filesystem + disable user management)
 - [x] WP vulnerability check (CVE scanning via WPVulnerability.net API)
+- [x] WP health check (FPM PHP binary probe — DB, plugin/theme fatals)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -527,6 +528,32 @@ Scan WordPress sites for untracked git files, classify them, and either report o
 - Skips frozen sites (detected via `code-freeze.php` mu-plugin)
 - Language `.json` files are auto-ignored (WP-generated JED hashes)
 - Runs git as the site owner to avoid dubious ownership errors
+
+### wp-health-check.sh
+
+WordPress health auditor for RunCloud servers. Discovers all WordPress webapps and probes each via `wp eval` invoked through the site's actual FPM/LSPHP binary — bypasses Cloudflare and catches real failures (DB connection broken, plugin/theme fatals).
+
+**Key detail:** Uses the app's FPM PHP binary (detected from RunCloud FPM pools or OpenLiteSpeed LSAPI) as the PHP interpreter for wp-cli. The system CLI PHP may lack extensions (e.g. `mysqli`) that the FPM PHP has, so using the wrong PHP causes false-positive "MySQL extension missing" errors.
+
+**Probe all sites (show failures only):**
+```bash
+./wp-health-check.sh
+```
+
+**Probe a single site:**
+```bash
+./wp-health-check.sh --site=myapp
+```
+
+**Dry-run (discover sites + FPM versions):**
+```bash
+./wp-health-check.sh --dry-run
+```
+
+**JSON output:**
+```bash
+./wp-health-check.sh --format=json
+```
 
 ### change-ssh-port.sh
 

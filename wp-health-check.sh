@@ -8,6 +8,12 @@
 # positives, and catches real failures: DB connection broken, plugin/theme
 # fatals, PHP version mismatches.
 #
+# FPM PHP binary detection: detect_fpm_php() finds the app's PHP binary
+# from RunCloud FPM pools or OpenLiteSpeed LSAPI. If found, it is used as
+# the PHP interpreter for wp-cli — this is critical because the system CLI
+# PHP (/usr/bin/php) may lack extensions (e.g. mysqli) that the FPM PHP
+# has, causing false-positive "MySQL extension missing" errors.
+#
 # Usage:
 #   ./wp-health-check.sh                            # all sites, fails only
 #   ./wp-health-check.sh --site=APPNAME             # single site
@@ -151,10 +157,12 @@ for path in "${TARGETS[@]}"; do
     status="ok"
     error_excerpt=""
 
-    # Detect FPM PHP version
+    # Detect FPM PHP version and binary
     php_ver="-"
+    php_bin=""
     if det=$(detect_fpm_php "$path" "$name"); then
         php_ver=$(echo "$det" | cut -f1)
+        php_bin=$(echo "$det" | cut -f2)
     fi
 
     # Find site owner
@@ -169,12 +177,19 @@ for path in "${TARGETS[@]}"; do
         continue
     fi
 
+    # Use FPM PHP binary if detected — system CLI PHP may lack extensions (e.g. mysqli)
+    if [ -n "${php_bin-}" ] && [ -x "$php_bin" ]; then
+        WP_CMD="$php_bin $WP_CLI"
+    else
+        WP_CMD="$WP_CLI"
+    fi
+
     # Health probe: wp eval + db check
-    probe_output=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" --skip-plugins --skip-themes eval 'echo "WP_PROBE_OK";' 2>&1) || true
+    probe_output=$(sudo -u "$SITE_OWNER" $WP_CMD --path="$path" --skip-plugins --skip-themes eval 'echo "WP_PROBE_OK";' 2>&1) || true
 
     if echo "$probe_output" | grep -q "WP_PROBE_OK"; then
         # wp-cli works with bare WP — now check plugins/themes active
-        full_probe=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" eval '
+        full_probe=$(sudo -u "$SITE_OWNER" $WP_CMD --path="$path" eval '
             echo "DB_OK:";
             global $wpdb;
             echo $wpdb->check_database_version() ? "versions_ok" : "version_mismatch";
@@ -189,7 +204,7 @@ for path in "${TARGETS[@]}"; do
         fi
 
         # Check plugin/theme fatals by loading with plugins
-        plugin_probe=$(sudo -u "$SITE_OWNER" "$WP_CLI" --path="$path" --skip-themes plugin list --format=csv 2>&1 | head -1) || true
+        plugin_probe=$(sudo -u "$SITE_OWNER" $WP_CMD --path="$path" --skip-themes plugin list --format=csv 2>&1 | head -1) || true
         if echo "$plugin_probe" | grep -qi "error\|fatal\|Fatal"; then
             status="fail"
             error_excerpt="$error_excerpt PluginList: $(echo "$plugin_probe" | head -1)"
