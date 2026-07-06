@@ -21,6 +21,7 @@ yellow(){ echo -e "\033[33m$1\033[0m"; }
 
 # Default scan path
 SCANPATH="/home/*/webapps/*"
+SCANPATHS="$SCANPATH"
 
 # Parse arguments
 for arg in "$@"; do
