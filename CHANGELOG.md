@@ -2,7 +2,15 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
-## [1.1.0] — 2026-07-04
+## [1.2.0] — 2026-07-10
+
+### Added
+
+- **wp-ownership-audit.sh** — Scans WordPress webapps for file ownership issues that silently break sites:
+  - Root-owned files in webapp directories (block wp-cli, cause 500 errors)
+  - Wrong-user owned files (user A's webapp has files owned by user B)
+  - ACL deny entries (`group:users-rc:---`) that prevent PHP-FPM from reading files
+  - Supports `--site`, `--dirs-only` (quick check), `--fix` (auto-repair), `--format=json`
 
 ### Fixed
 
@@ -14,6 +22,12 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
     as the PHP interpreter for all three wp-cli invocations (bare probe, DB eval,
     plugin list).
   - Falls back to system PHP gracefully when FPM binary cannot be detected.
+
+## [1.1.0] — 2026-07-04
+
+### Added
+
+- `wp-ownership-audit.sh` — File ownership audit script
 
 ## [1.0.0] — 2026-06-27
 

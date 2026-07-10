@@ -20,6 +20,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] WordPress code freeze (lock filesystem + disable user management)
 - [x] WP vulnerability check (CVE scanning via WPVulnerability.net API)
 - [x] WP health check (FPM PHP binary probe — DB, plugin/theme fatals)
+- [x] WP ownership audit (detect root-owned files + ACL deny entries)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -553,6 +554,38 @@ WordPress health auditor for RunCloud servers. Discovers all WordPress webapps a
 **JSON output:**
 ```bash
 ./wp-health-check.sh --format=json
+```
+
+### wp-ownership-audit.sh
+
+Scans WordPress webapps for file ownership issues that silently break sites:
+- **Root-owned files** in webapp directories → block wp-cli, cause HTTP 500
+- **Wrong-user owned files** → user A's webapp has files owned by user B
+- **ACL deny entries** (`group:users-rc:---`) → PHP-FPM can't read files
+
+**Quick check (top-level dirs only):**
+```bash
+./wp-ownership-audit.sh --dirs-only
+```
+
+**Full deep scan:**
+```bash
+./wp-ownership-audit.sh
+```
+
+**Scan a single site:**
+```bash
+./wp-ownership-audit.sh --site=myapp
+```
+
+**Auto-fix ownership (chown to site owner):**
+```bash
+./wp-ownership-audit.sh --fix
+```
+
+**JSON output:**
+```bash
+./wp-ownership-audit.sh --format=json
 ```
 
 ### change-ssh-port.sh
