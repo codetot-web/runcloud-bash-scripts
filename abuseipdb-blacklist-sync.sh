@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# abuseipdb-blacklist-sync.sh - Download + apply AbuseIPDB blacklist
+# abuseipdb-blacklist-sync.sh — Download + apply AbuseIPDB blacklist
 # Reads ABUSEIPDB_API_KEY from /var/lib/abuseipdb/.env
 set -euo pipefail
 
@@ -16,13 +16,10 @@ log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
 info() { echo -e "\033[32m[INFO]\033[0m  $*"; }
 warn() { echo -e "\033[33m[WARN]\033[0m  $*"; }
 
-# Load API key
 [ -f "$ENV_FILE" ] || { warn "$ENV_FILE not found"; exit 1; }
-# shellcheck source=/dev/null
 . "$ENV_FILE"
 [ -n "${ABUSEIPDB_API_KEY:-}" ] || { warn "ABUSEIPDB_API_KEY not set"; exit 1; }
 
-# Detect firewall
 FW=""
 if command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active -q firewalld 2>/dev/null; then FW="firewalld"
 elif command -v nft >/dev/null 2>&1; then FW="nftables"
@@ -30,7 +27,6 @@ elif command -v iptables >/dev/null 2>&1; then FW="iptables"
 else log "ERROR: No firewall"; exit 1; fi
 info "Firewall: $FW"
 
-# Download
 mkdir -p "$BL_DIR"
 info "Downloading blacklist (confidence >= $CONFIDENCE_MIN)..."
 HTTP=$(curl -so "$BLACKLIST_JSON" -w '%{http_code}' -G "$API_BASE/blacklist" \

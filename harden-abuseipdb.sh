@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # harden-abuseipdb.sh v1.0.0 - Fail2Ban + AbuseIPDB integration
-# Reads API key from /var/lib/abuseipdb/.env (ABUSEIPDB_API_KEY=...)
+# Reads API key from /var/lib/abuseipdb/.env (ABUSEIPDB_API_KEY=...).
+# Idempotent - safe to re-run.
 set -euo pipefail
 
 VERSION="1.0.0"
@@ -25,18 +26,22 @@ done
 
 require_root() { [ "$(id -u)" -eq 0 ] || { error "need root"; exit 1; }; }
 
+detect_platform() {
+  if systemctl is-active --quiet lsws-rc 2>/dev/null; then echo "runcloud"
+  elif [ -f "/usr/sbin/apache2" ]; then echo "litesoup"
+  else echo "unknown"; fi
+}
+
 load_env() {
   [ -f "$ENV_FILE" ] || { error "$ENV_FILE not found"; exit 1; }
-  # shellcheck source=/dev/null
   . "$ENV_FILE"
   [ -n "${ABUSEIPDB_API_KEY:-}" ] && return 0
-  error "ABUSEIPDB_API_KEY not set in $ENV_FILE"
-  exit 1
+  error "ABUSEIPDB_API_KEY not set in $ENV_FILE"; exit 1
 }
 
 write_file() {
   local p="$1" c="$2" m="${3:-644}"
-  [ "$DRY" = "1" ] && { info "[DRY] $p"; return; }
+  [ "$DRY" = "1" ] && { ok "[DRY] $p"; return; }
   local t; t="$(mktemp)"
   printf '%s' "$c" > "$t"
   if [ -f "$p" ] && cmp -s "$t" "$p" 2>/dev/null; then ok "$p"; rm -f "$t"; return; fi
@@ -55,50 +60,44 @@ test_key() {
   warn "API key HTTP $s"; return 1
 }
 
+# Write jail config with ONE logpath (fail2ban rejects duplicate logpath keys)
+write_jail() {
+  local name="$1" logpath="$2" maxretry="$3" bantime="$4" findtime="$5" port="${6:-http,https}"
+  local c
+  c="# managed by harden-abuseipdb.sh
+[$name]
+enabled = true
+port = $port
+maxretry = $maxretry
+bantime = $bantime
+findtime = $findtime
+logpath = $logpath
+"
+  write_file "$JAIL_DIR/litesoup-${name#apache-}.local" "$c"
+}
+
 phase1_jails() {
   info "Phase 1: Extended Fail2Ban jails"; C=0
-  for name in badbots overflows noscript; do
-    local c=""
-    case "$name" in
-      badbots)
-        c="# managed by harden-abuseipdb.sh
-[apache-badbots]
-enabled = true
-port = http,https
-maxretry = 1
-bantime = 86400
-findtime = 86400
-logpath = /var/log/apache2/*access.log
-logpath = /usr/local/lsws/logs/access.log
-"
-        ;;
-      overflows)
-        c="# managed by harden-abuseipdb.sh
-[apache-overflows]
-enabled = true
-port = http,https
-maxretry = 2
-bantime = 86400
-findtime = 600
-logpath = /var/log/apache2/*error.log
-logpath = /usr/local/lsws/logs/error.log
-"
-        ;;
-      noscript)
-        c="# managed by harden-abuseipdb.sh
-[apache-noscript]
-enabled = true
-port = http,https
-maxretry = 3
-bantime = 86400
-findtime = 600
-logpath = /var/log/apache2/*error.log
-"
-        ;;
-    esac
-    write_file "$JAIL_DIR/litesoup-$name.local" "$c"
-  done
-  [ "$C" = "1" ] && [ "$DRY" != "1" ] && systemctl reload fail2ban 2>/dev/null || true
+  local platform; platform="$(detect_platform)"
+  info "Platform: $platform"
+
+  if [ "$platform" = "runcloud" ]; then
+    local alog="/usr/local/lsws/logs/access.log"
+    local elog="/usr/local/lsws/logs/error.log"
+  elif [ "$platform" = "litesoup" ]; then
+    local alog="/var/log/apache2/*access.log"
+    local elog="/var/log/apache2/*error.log"
+  else
+    warn "Unknown platform - guessing Apache paths"
+    local alog="/var/log/apache2/*access.log"
+    local elog="/var/log/apache2/*error.log"
+  fi
+
+  write_jail "apache-badbots"   "$alog" 1 86400 86400
+  write_jail "apache-overflows" "$elog" 2 86400 600
+  write_jail "apache-noscript"  "$elog" 3 86400 600
+
+  [ "$C" = "1" ] && [ "$DRY" != "1" ] && systemctl restart fail2ban || true
 }
 
 phase2_action() {
@@ -106,7 +105,7 @@ phase2_action() {
   local action
   action="# managed by harden-abuseipdb.sh
 [Definition]
-actionban = lgm=\$(printf '%.1000s\n' \"<matches>\"); curl -sSf \"$API/report\" -H \"Accept: application/json\" -H \"Key: $ABUSEIPDB_API_KEY\" --data-urlencode \"comment=\$lgm\" --data-urlencode \"ip=<ip>\" --data \"categories=<abuseipdb_category>\"
+actionban = lgm=\$(printf '%%.1000s\n' \"<matches>\"); curl -sSf \"$API/report\" -H \"Accept: application/json\" -H \"Key: $ABUSEIPDB_API_KEY\" --data-urlencode \"comment=\$lgm\" --data-urlencode \"ip=<ip>\" --data \"categories=<abuseipdb_category>\"
 actionunban =
 
 [Init]
@@ -137,9 +136,9 @@ abuseipdb_category = 18,22
 "
   write_file "$JAIL_DIR/litesoup-abuseipdb.local" "$jailconf"
 
-  # Append action to each jail
+  # Append action to each jail if not present
   for jn in sshd apache-auth apache-badbots apache-overflows apache-noscript; do
-    local jf="$JAIL_DIR/litesoup-$jn.local"
+    local jf="$JAIL_DIR/litesoup-${jn#apache-}.local"
     [ -f "$jf" ] || continue
     grep -q 'action_abuseipdb' "$jf" 2>/dev/null && continue
     local jc; jc=$(cat "$jf")
@@ -147,18 +146,16 @@ abuseipdb_category = 18,22
     write_file "$jf" "$jc"
   done
 
-  [ "$DRY" != "1" ] && systemctl reload fail2ban 2>/dev/null || true
+  [ "$DRY" != "1" ] && systemctl restart fail2ban || true
 }
 
 phase3_blacklist() {
   info "Phase 3: Blacklist sync"; C=0
   [ "$DRY" != "1" ] && mkdir -p "$BL_DIR"
 
-  # Deploy sync script with env-based key
   local src
   src="$(dirname "$(readlink -f "$0")")/abuseipdb-blacklist-sync.sh"
   if [ -f "$src" ]; then
-    # Script reads .env itself, no API key injection needed
     install -m 755 -o root -g root "$src" "$SYNC_DST"
     info "Deployed $SYNC_DST"
   else
