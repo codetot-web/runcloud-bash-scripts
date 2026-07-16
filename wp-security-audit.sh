@@ -285,9 +285,10 @@ for SCANPATH in $SCANPATHS; do
   echo "--- Phase 2: Deep Scan (ClamAV + Rootkit) ---"
 
   if $CLAMAV_AVAIL; then
-    echo "[ClamAV Scan]"
-    clamscan -r "$SCANPATH" --bell -i \
+    echo "[ClamAV Scan] (low priority — nice 19, ionice idle)"
+    ionice -c 2 -n 7 nice -n 19 clamscan -r "$SCANPATH" --bell -i \
       --exclude-dir="^$SCANPATH/wp-content/cache" \
+      --max-filesize=100M --max-scansize=200M \
       2>&1 | tee -a "$LOGFILE" | tail -5
   else
     yellow "[SKIP] ClamAV not installed"

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODE TỐT — Fail2ban Unban IP — SOP | CODE TỐT</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+      colors: {
+        primary: '#0E103D',
+        secondary: '#094074',
+        accent: '#E85D2C',
+        light: '#F3F7F0',
+        dark: '#353739',
+      }
+    }
+  }
+}
+</script>
+<style>
+[x-cloak] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.prose { max-width: 100%; }
+.prose h1 { font-size: 1.75rem; font-weight: 700; color: #0E103D; margin-top: 2rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #E85D2C; }
+.prose h2 { font-size: 1.35rem; font-weight: 700; color: #0E103D; margin-top: 1.75rem; margin-bottom: 0.5rem; }
+.prose h3 { font-size: 1.1rem; font-weight: 600; color: #0E103D; margin-top: 1.25rem; margin-bottom: 0.375rem; }
+.prose h4 { font-size: 1rem; font-weight: 600; color: #353739; margin-top: 1rem; margin-bottom: 0.25rem; }
+.prose p { margin-bottom: 0.875rem; line-height: 1.75; color: #353739; }
+.prose ul, .prose ol { margin-bottom: 0.875rem; padding-left: 1.5rem; }
+.prose li { margin-bottom: 0.25rem; line-height: 1.75; color: #353739; }
+.prose ul li { list-style-type: disc; }
+.prose ol li { list-style-type: decimal; }
+.prose code { background: #F3F7F0; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #094074; }
+.prose pre { background: #0E103D; color: #e5e7eb; padding: 1rem 1.25rem; border-radius: 10px; overflow-x: auto; margin-bottom: 1rem; font-size: 0.8rem; line-height: 1.6; }
+.prose pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+.prose blockquote { border-left: 4px solid #E85D2C; background: #F3F7F0; padding: 0.75rem 1rem 0.75rem 1.25rem; margin-bottom: 1rem; border-radius: 0 8px 8px 0; color: #353739; font-style: italic; }
+.prose blockquote p { margin-bottom: 0; }
+.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
+.prose th { background: #0E103D; color: white; padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; }
+.prose td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e5e7eb; }
+.prose tr:nth-child(even) td { background: #F3F7F0; }
+.prose hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
+.prose strong { color: #0E103D; font-weight: 600; }
+.prose a { color: #E85D2C; text-decoration: underline; text-underline-offset: 2px; font-weight: 500; }
+.prose a:hover { color: #0E103D; }
+.prose img { max-width: 100%; border-radius: 8px; margin: 1rem 0; border: 1px solid #e5e7eb; }
+@media (max-width: 640px) {
+  .prose pre { font-size: 0.7rem; padding: 0.75rem; }
+  .prose table { font-size: 0.75rem; }
+  .prose th, .prose td { padding: 0.375rem 0.5rem; }
+}
+</style>
+</head>
+<body class="font-sans antialiased text-dark bg-[#F3F7F0]/30">
+
+<!-- NAV -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-14">
+      <a href="/" class="flex items-center gap-2 font-bold text-primary text-sm no-underline">
+        <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
+          <polygon points="50,10 82,30 82,70 50,90 18,70 18,30" fill="#0E103D"/>
+          <path d="M62 38l12 14-12 14" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M38 38l-12 14 12 14" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        SOP
+      </a>
+      <nav class="flex items-center gap-4">
+        <a href="/" class="text-xs text-gray-500 hover:text-primary font-medium no-underline transition-colors">← Danh sách SOP</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="pt-20 pb-16 px-4">
+  <div class="mx-auto max-w-4xl">
+    <div class="prose">
+
+<h1>🔒 Fail2ban Unban IP</h1>
+
+<p><strong>Mục đích:</strong> Quy trình kiểm tra và unban IP bị fail2ban block trên server, áp dụng khi team không SSH được vào server do IP bị ban nhầm.</p>
+
+<hr />
+
+<h2>1. Kiểm tra trạng thái fail2ban</h2>
+
+<p>Trước khi unban, xác nhận IP thực sự bị ban bằng cách kiểm tra jail liên quan:</p>
+
+<pre><code># Kiểm tra tất cả jail
+sudo fail2ban-client status
+
+# Kiểm tra jail sshd (phổ biến nhất)
+sudo fail2ban-client status sshd
+
+# Kiểm tra jail sshd-ddos (nếu có)
+sudo fail2ban-client status sshd-ddos
+
+# Kiểm tra banned IP list
+sudo fail2ban-client banned</code></pre>
+
+<h2>2. Unban IP</h2>
+
+<p>Xoá IP khỏi jail bằng lệnh sau (thay <code>xxx.xxx.xxx.xxx</code> bằng IP cần unban):</p>
+
+<pre><code># Unban khỏi jail sshd
+sudo fail2ban-client set sshd unbanip xxx.xxx.xxx.xxx
+
+# Unban khỏi jail sshd-ddos (nếu có)
+sudo fail2ban-client set sshd-ddos unbanip xxx.xxx.xxx.xxx
+
+# Unban khỏi jail runcloud-agent (nếu có)
+sudo fail2ban-client set runcloud-agent unbanip xxx.xxx.xxx.xxx</code></pre>
+
+<blockquote>
+<p><strong>⚠️ Lưu ý:</strong> Không ghi lại IP cụ thể trong báo cáo hay document — chỉ unban và kết thúc. Unban cần chạy riêng trên từng server (fail2ban không sync giữa các máy). Sau unban kiểm tra lại bằng <code>sudo fail2ban-client status sshd</code> — IP không còn trong banned list.</p>
+</blockquote>
+
+<h2>3. Kiểm tra nguyên nhân bị ban</h2>
+
+<p>Xác định lý do IP bị ban từ log:</p>
+
+<pre><code># Kiểm tra fail2ban log
+sudo grep 'xxx.xxx.xxx.xxx' /var/log/fail2ban.log
+
+# Kiểm tra auth log — xem failed attempts
+sudo grep 'xxx.xxx.xxx.xxx' /var/log/auth.log | tail -10
+
+# Kiểm tra journal (nếu dùng systemd)
+journalctl -u sshd --no-pager | grep 'xxx.xxx.xxx.xxx'</code></pre>
+
+<p><em>Ghi chú: auth.log và journal có thể bị rotate. Nếu không tìm thấy log, kiểm tra file log cũ (<code>auth.log.1</code>, <code>auth.log.2.gz</code>) bằng <code>zcat</code>.</em></p>
+
+<h2>4. Debug SSH kết nối</h2>
+
+<p>Nếu vẫn không SSH được sau khi unban, kiểm tra thêm:</p>
+
+<pre><code># Kiểm tra IPTABLES còn block không
+sudo iptables -L INPUT -n --line-numbers
+
+# Kiểm tra ufw (nếu dùng)
+sudo ufw status
+
+# Kiểm tra fail2ban iptables chain
+sudo iptables -L f2b-sshd -n</code></pre>
+
+<h2>5. Phòng ngừa</h2>
+
+<ul>
+<li>Luôn SSH bằng <strong>public key</strong>, không dùng password.</li>
+<li>Kiểm tra SSH config local trước khi connect hàng loạt (script/cron) — sai user có thể gây failed attempts hàng loạt, kích hoạt fail2ban.</li>
+<li>Nếu có automation (cron job, health check) chạy SSH hàng loạt, cân nhắc whitelist IP nguồn trong fail2ban.</li>
+</ul>
+
+<hr />
+
+<p><em>Cập nhật lần cuối: 2026-07-15</em></p>
+
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
