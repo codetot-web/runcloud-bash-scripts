@@ -137,7 +137,7 @@ abuseipdb_category = 18,22
   write_file "$JAIL_DIR/litesoup-abuseipdb.local" "$jailconf"
 
   # Append action to each jail if not present
-  for jn in sshd apache-auth apache-badbots apache-overflows apache-noscript; do
+  for jn in sshd sshd-ddos runcloud-agent apache-auth apache-badbots apache-overflows apache-noscript; do
     local jf="$JAIL_DIR/litesoup-${jn#apache-}.local"
     [ -f "$jf" ] || continue
     grep -q 'action_abuseipdb' "$jf" 2>/dev/null && continue
@@ -165,7 +165,7 @@ phase3_blacklist() {
   cron="# managed by harden-abuseipdb.sh
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-0 */6 * * * root $SYNC_DST >/dev/null 2>&1
+0 */12 * * * root $SYNC_DST >/dev/null 2>&1
 "
   write_file "$CRON_FILE" "$cron"
 

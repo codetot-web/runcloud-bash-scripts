@@ -23,6 +23,12 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
 ### Fixed
 
+- **abuseipdb-blacklist-sync.sh**: Graceful handling of HTTP 429 (rate limit) — skips cycle instead of failing
+- **harden-abuseipdb.sh**: Include `runcloud-agent` and `sshd-ddos` jails in AbuseIPDB action wiring
+- **abuseipdb-blacklist-sync.sh**: Reduce cron frequency to every 12h to stay within API rate limits
+- **harden-abuseipdb.sh**: Single `logpath` per jail (fail2ban rejects duplicate keys)
+- **harden-abuseipdb.sh**: Double-`%%` escape in actionban `printf` format string
+
 - **harden-abuseipdb.sh**: Single `logpath` per jail (fail2ban rejects duplicate keys)
 - **harden-abuseipdb.sh**: Double-`%%` escape in actionban `printf` format string (fail2ban uses `%` as escape char)
 

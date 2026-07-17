@@ -32,7 +32,13 @@ info "Downloading blacklist (confidence >= $CONFIDENCE_MIN)..."
 HTTP=$(curl -so "$BLACKLIST_JSON" -w '%{http_code}' -G "$API_BASE/blacklist" \
   -d "confidenceMinimum=$CONFIDENCE_MIN" -d "limit=500" \
   -H "Key: $ABUSEIPDB_API_KEY" -H "Accept: application/json" 2>/dev/null || echo "000")
-[ "$HTTP" = "200" ] || { log "ERROR: HTTP $HTTP"; warn "Download failed"; rm -f "$BLACKLIST_JSON"; exit 1; }
+if [ "$HTTP" = "429" ]; then
+  log "RATE LIMITED (429) - will retry next cycle"
+  warn "AbuseIPDB rate limit hit - skipping this cycle"
+  rm -f "$BLACKLIST_JSON"
+  exit 0
+fi
+[ "$HTTP" = "200" ] || { log "ERROR: HTTP $HTTP"; warn "Download failed HTTP $HTTP"; rm -f "$BLACKLIST_JSON"; exit 1; }
 
 python3 -c "
 import json
