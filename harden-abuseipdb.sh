@@ -117,7 +117,8 @@ abuseipdb_category = 18,22
   local jailconf
   jailconf="# managed by harden-abuseipdb.sh
 [DEFAULT]
-action_abuseipdb = abuseipdb[abuseipdb_category=\"18,22,15\"]
+ignoreip = 127.0.0.1/8 ::1 10.0.0.0/8 14.162.0.0/16 14.103.0.0/16 160.191.0.0/16 36.50.0.0/16 20.78.0.0/16
+action_abuseipdb = abuseipdb[abuseipdb_category=\"14,15,18\"]
 
 [apache-badbots]
 abuseipdb_category = 14,15
@@ -131,13 +132,11 @@ abuseipdb_category = 15
 [apache-auth]
 abuseipdb_category = 15,18
 
-[sshd]
-abuseipdb_category = 18,22
 "
   write_file "$JAIL_DIR/litesoup-abuseipdb.local" "$jailconf"
 
   # Append action to each jail if not present
-  for jn in sshd sshd-ddos runcloud-agent apache-auth apache-badbots apache-overflows apache-noscript; do
+  for jn in apache-auth apache-badbots apache-overflows apache-noscript; do
     local jf="$JAIL_DIR/litesoup-${jn#apache-}.local"
     [ -f "$jf" ] || continue
     grep -q 'action_abuseipdb' "$jf" 2>/dev/null && continue
