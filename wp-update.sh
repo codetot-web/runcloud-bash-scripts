@@ -450,6 +450,13 @@ update_core() {
         success "Core updated: $CURRENT → $NEW"
         # Run database update
         $WP core update-db 2>&1 || true
+        # Post-update: fix ownership (belt-and-suspenders)
+        root_count=$(find "$SITE_PATH/wp-admin" "$SITE_PATH/wp-includes" -user root 2>/dev/null | wc -l)
+        if [ "$root_count" -gt 0 ]; then
+            warn "Found $root_count root-owned core files — fixing ownership"
+            chown -R "$SITE_OWNER":"$SITE_OWNER" "$SITE_PATH/wp-admin" "$SITE_PATH/wp-includes" 2>/dev/null || true
+            ok "Ownership fixed: $SITE_OWNER"
+        fi
     elif echo "$OUTPUT" | grep -q "already up-to-date\|already the latest"; then
         success "Core is already up to date ($CURRENT)"
     fi
