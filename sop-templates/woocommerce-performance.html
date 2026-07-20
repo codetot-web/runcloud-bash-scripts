@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODE TỐT — WooCommerce Performance Optimization — SOP | CODE TỐT</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Plus Jakarta Sans', 'system-ui', 'sans-serif'] },
+      colors: {
+        primary: '#0E103D',
+        secondary: '#094074',
+        accent: '#E85D2C',
+        light: '#F3F7F0',
+        dark: '#353739',
+      }
+    }
+  }
+}
+</script>
+<style>
+[x-cloak] { display: none !important; }
+html { scroll-behavior: smooth; }
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+.prose { max-width: 100%; }
+.prose h1 { font-size: 1.75rem; font-weight: 700; color: #0E103D; margin-top: 2rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #E85D2C; }
+.prose h2 { font-size: 1.35rem; font-weight: 700; color: #0E103D; margin-top: 1.75rem; margin-bottom: 0.5rem; }
+.prose h3 { font-size: 1.1rem; font-weight: 600; color: #0E103D; margin-top: 1.25rem; margin-bottom: 0.375rem; }
+.prose h4 { font-size: 1rem; font-weight: 600; color: #353739; margin-top: 1rem; margin-bottom: 0.25rem; }
+.prose p { margin-bottom: 0.875rem; line-height: 1.75; color: #353739; }
+.prose ul, .prose ol { margin-bottom: 0.875rem; padding-left: 1.5rem; }
+.prose li { margin-bottom: 0.25rem; line-height: 1.75; color: #353739; }
+.prose ul li { list-style-type: disc; }
+.prose ol li { list-style-type: decimal; }
+.prose code { background: #F3F7F0; padding: 2px 6px; border-radius: 4px; font-size: 0.85em; color: #094074; }
+.prose pre { background: #0E103D; color: #e5e7eb; padding: 1rem 1.25rem; border-radius: 10px; overflow-x: auto; margin-bottom: 1rem; font-size: 0.8rem; line-height: 1.6; }
+.prose pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+.prose blockquote { border-left: 4px solid #E85D2C; background: #F3F7F0; padding: 0.75rem 1rem 0.75rem 1.25rem; margin-bottom: 1rem; border-radius: 0 8px 8px 0; color: #353739; font-style: italic; }
+.prose blockquote p { margin-bottom: 0; }
+.prose table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; font-size: 0.85rem; }
+.prose th { background: #0E103D; color: white; padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; }
+.prose td { padding: 0.5rem 0.75rem; border-bottom: 1px solid #e5e7eb; }
+.prose tr:nth-child(even) td { background: #F3F7F0; }
+.prose hr { border: none; border-top: 1px solid #e5e7eb; margin: 1.5rem 0; }
+.prose strong { color: #0E103D; font-weight: 600; }
+.prose a { color: #E85D2C; text-decoration: underline; text-underline-offset: 2px; font-weight: 500; }
+.prose a:hover { color: #0E103D; }
+.prose img { max-width: 100%; border-radius: 8px; margin: 1rem 0; border: 1px solid #e5e7eb; }
+@media (max-width: 640px) {
+  .prose pre { font-size: 0.7rem; padding: 0.75rem; }
+  .prose table { font-size: 0.75rem; }
+  .prose th, .prose td { padding: 0.375rem 0.5rem; }
+}
+</style>
+</head>
+<body class="font-sans antialiased text-dark bg-[#F3F7F0]/30">
+
+<!-- NAV -->
+<header class="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-14">
+      <a href="/" class="flex items-center gap-2 font-bold text-primary text-sm no-underline">
+        <svg width="22" height="22" viewBox="0 0 100 100" fill="none">
+          <polygon points="50,10 82,30 82,70 50,90 18,70 18,30" fill="#0E103D"/>
+          <path d="M62 38l12 14-12 14" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <path d="M38 38l-12 14 12 14" stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        SOP
+      </a>
+      <nav class="flex items-center gap-4">
+        <a href="/" class="text-xs text-gray-500 hover:text-primary font-medium no-underline transition-colors">← Danh sách SOP</a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main class="pt-20 pb-16 px-4">
+  <div class="mx-auto max-w-4xl">
+    <div class="prose">
+
+<h1>⚡ WooCommerce Performance Optimization</h1>
+
+<p><strong>Mục đích:</strong> Giảm thiểu high load, HTTP 500 errors, và swap usage trên WooCommerce sites. Áp dụng khi server có dấu hiệu quá tải hoặc search gây crash.</p>
+
+<hr />
+
+<h2>1. Search Engine — Replace WooCommerce Native Search</h2>
+
+<p>Search là nguyên nhân số 1 gây high load trên WooCommerce. Native search dùng MySQL LIKE queries phức tạp + filter attributes → PHP timeout → 500 errors → lsphp workers stuck.</p>
+
+<h3>Option A: Typesense (Recommended)</h3>
+<pre><code># Install
+apt-get install typesense-server
+
+# Config (/etc/typesense/typesense-server.ini)
+api-key = &lt;generate via: openssl rand -hex 32&gt;
+data-dir = /var/lib/typesense
+api-port = 8108
+api-address = 127.0.0.1
+
+# Restart
+systemctl restart typesense-server
+
+# Install WP plugin
+wp plugin install search-with-typesense --activate
+wp option update cm_typesense_admin_settings '{...}' --format=json
+wp typesense index product</code></pre>
+
+<h3>Option B: Relevanssi Premium</h3>
+<pre><code>wp plugin install relevanssi --activate
+# Premium version supports WooCommerce product search weighting</code></pre>
+
+<h2>2. MariaDB Tuning</h2>
+
+<p>InnoDB buffer pool thường được set quá cao, gây swap. Công thức: 20-25% tổng RAM, tối đa 2GB trên shared server.</p>
+
+<pre><code># /etc/mysql/mariadb.conf.d/99-custom.cnf
+[mysqld]
+innodb_buffer_pool_size = 1536M    # 1.5GB cho server 7.8GB RAM
+
+# Apply
+systemctl restart mariadb
+
+# Chú ý: Không dùng giá trị thập phân (vd: 1.5G)
+# MariaDB chỉ chấp nhận integer suffix: 512M, 1G, 1536M</code></pre>
+
+<h2>3. Bot & Scanner Blocking</h2>
+
+<p>Chặn bot crawl search pages và scanner probing để giảm tải:</p>
+
+<pre><code># .htaccess — block bot search access
+RewriteCond %{QUERY_STRING} (^|&)s= [NC]
+RewriteCond %{HTTP_USER_AGENT} (Googlebot|bingbot|GoogleOther) [NC]
+RewriteRule .* - [R=403,L]
+
+# Block scanner IPs
+RewriteCond %{REMOTE_ADDR} ^20\.226\.26\.5
+RewriteRule .* - [R=403,L]</code></pre>
+
+<h2>4. ClamAV CPU/IO Limit</h2>
+
+<p>Security audit ClamAV scan có thể gây CPU 100% trên server có uploads lớn.</p>
+
+<pre><code># Trong wp-security-audit.sh — wrap clamscan với nice + ionice:
+ionice -c 2 -n 7 nice -n 19 clamscan -r "$SCANPATH" --bell -i \
+  --exclude-dir="^$SCANPATH/wp-content/cache" \
+  --max-filesize=100M --max-scansize=200M</code></pre>
+
+<h2>5. WP-Cron Frequency</h2>
+
+<p>Kiểm tra và giảm tần suất wp-cron nếu quá frequent:</p>
+
+<pre><code># Kiểm tra crontab của runcloud user
+crontab -u runcloud -l
+
+# Các mức tần suất nên dùng:
+# */5   → quá frequent, cần giảm
+# */10  → chấp nhận được
+# */30  → khuyến nghị cho WooCommerce site
+# 0 *   → mỗi giờ, phù hợp cho site ít cập nhật</code></pre>
+
+<h2>6. Fail2ban Unban</h2>
+
+<p>Xem SOP riêng: <a href="fail2ban-unban.html">Fail2ban Unban IP</a></p>
+
+<h2>7. Kiểm tra định kỳ</h2>
+
+<pre><code># Kiểm tra swap
+free -h
+swapon --show
+
+# Kiểm tra MariaDB memory
+ps aux | grep mariadb | awk '{print $6/1024 " MB RSS"}'
+
+# Kiểm tra lsphp workers
+pgrep -c lsphp
+ps aux --sort=-%rss | grep lsphp | head -5
+
+# Kiểm tra 500 errors
+grep ' 500 ' /path/to/access.log | wc -l
+awk '$9 == 500 {print $7}' access.log | sort | uniq -c | sort -rn | head -5</code></pre>
+
+<hr />
+
+<p><em>Cập nhật lần cuối: 2026-07-20</em></p>
+
+    </div>
+  </div>
+</main>
+
+</body>
+</html>
