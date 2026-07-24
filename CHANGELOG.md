@@ -2,7 +2,7 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
-## [1.4.0] — 2026-07-24
+## [v0.0.2.0] — 2026-07-24
 
 ### Added
 
@@ -20,7 +20,7 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
   gracefully. Runs alongside existing OpenLiteSpeed and RunCloud installers
   — auto-detects which stacks are present. (`install-ioncube.sh`)
 
-## [1.3.0] — 2026-07-16
+## [v0.0.1.10] — 2026-07-16
 
 ### Added
 
@@ -45,12 +45,9 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
 - **harden-abuseipdb.sh**: Include `runcloud-agent` and `sshd-ddos` jails in AbuseIPDB action wiring
 - **abuseipdb-blacklist-sync.sh**: Reduce cron frequency to every 12h to stay within API rate limits
 - **harden-abuseipdb.sh**: Single `logpath` per jail (fail2ban rejects duplicate keys)
-- **harden-abuseipdb.sh**: Double-`%%` escape in actionban `printf` format string
-
-- **harden-abuseipdb.sh**: Single `logpath` per jail (fail2ban rejects duplicate keys)
 - **harden-abuseipdb.sh**: Double-`%%` escape in actionban `printf` format string (fail2ban uses `%` as escape char)
 
-## [1.2.0] — 2026-07-10
+## [v0.0.1.9] — 2026-07-10
 
 ### Added
 
@@ -60,13 +57,13 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
 - **wp-health-check.sh**: Use FPM PHP binary for wp-cli probe
 
-## [1.1.0] — 2026-07-04
+## [v0.0.1.8] — 2026-07-04
 
 ### Added
 
-- `wp-ownership-audit.sh` — File ownership audit script
+- **wp-ownership-audit.sh** — File ownership audit script
 
-## [1.0.0] — 2026-06-27
+## [v0.0.1.7] — 2026-06-27
 
 ### Added
 
