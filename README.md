@@ -90,10 +90,10 @@ Full WordPress migration between RunCloud servers. Handles database, config file
 
 ```bash
 # 1. Setup SSH keys to destination (one-time)
-./wp-migration.sh runcloud@sg3.codetot.org --setup-ssh
+./wp-migration.sh runcloud@YOUR_SERVER --setup-ssh
 
 # 2. Run migration with staging URL
-./wp-migration.sh runcloud@sg3.codetot.org myapp --staging-url=http://myapp.staging.temp-site.link
+./wp-migration.sh runcloud@YOUR_SERVER myapp --staging-url=http://myapp.staging.temp-site.link
 ```
 
 ### wp-local-to-production.sh
@@ -116,14 +116,14 @@ Sync a local WordPress site on this Mac to a RunCloud production webapp.
 **Examples:**
 
 ```bash
-./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" \
-  --production-url=http://cdev.example.temp-site.link
+./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" \
+  --production-url=http://example.temp-site.link
 
-./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" cdev \
-  --production-url=http://cdev.example.temp-site.link
+./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" myapp \
+  --production-url=http://example.temp-site.link
 
-./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" cdev \
-  --dry-run --production-url=http://cdev.example.temp-site.link
+./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" myapp \
+  --dry-run --production-url=http://example.temp-site.link
 ```
 
 **Flags:**
@@ -163,17 +163,17 @@ Full Laravel migration between RunCloud servers. Mirrors `wp-migration.sh` but f
 
 ```bash
 # Setup SSH (one-time)
-./laravel-migration.sh runcloud@sg4.codetot.org --setup-ssh
+./laravel-migration.sh runcloud@YOUR_SERVER --setup-ssh
 
 # Migrate with staging URL override
-./laravel-migration.sh runcloud@sg4.codetot.org myapp \
+./laravel-migration.sh runcloud@YOUR_SERVER myapp \
   --staging-url=http://myapp.staging.temp-site.link
 
 # Skip composer (e.g. vendor was already rsynced)
-./laravel-migration.sh runcloud@sg4.codetot.org myapp --skip-composer
+./laravel-migration.sh runcloud@YOUR_SERVER myapp --skip-composer
 
 # Skip migrations (don't run `php artisan migrate`)
-./laravel-migration.sh runcloud@sg4.codetot.org myapp --skip-migrate
+./laravel-migration.sh runcloud@YOUR_SERVER myapp --skip-migrate
 ```
 
 **Flags:**

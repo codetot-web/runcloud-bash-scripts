@@ -15,14 +15,14 @@
 # - It does not delete remote uploads by default
 #
 # Usage:
-#   ./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" \
-#     --production-url=http://cdev.example.temp-site.link
-#   ./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" cdev \
-#     --production-url=http://cdev.example.temp-site.link
-#   ./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" \
-#     --setup-ssh --production-url=http://cdev.example.temp-site.link
-#   ./wp-local-to-production.sh runcloud@sg4.codetot.org "/Users/khoipro/Local Sites/cdev/app/public" \
-#     --dry-run --production-url=http://cdev.example.temp-site.link
+#   ./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" \
+#     --production-url=http://example.temp-site.link
+#   ./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" myapp \
+#     --production-url=http://example.temp-site.link
+#   ./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" \
+#     --setup-ssh --production-url=http://example.temp-site.link
+#   ./wp-local-to-production.sh runcloud@YOUR_SERVER "/path/to/local/site/app/public" \
+#     --dry-run --production-url=http://example.temp-site.link
 #
 # Notes:
 # - Destination database credentials are read from the destination wp-config.php.

@@ -21,10 +21,10 @@
 # ./wp-migration.sh user@host[:port] --setup-ssh
 #
 # Examples:
-# Same app name:     ./wp-migration.sh runcloud@sg3.codetot.org myapp
-# Different app:     ./wp-migration.sh runcloud@sg3.codetot.org myapp newapp
-# With staging URL:  ./wp-migration.sh runcloud@sg3.codetot.org myapp --staging-url=http://myapp.temp-site.link
-# Setup SSH keys:    ./wp-migration.sh runcloud@sg3.codetot.org --setup-ssh
+# Same app name:     ./wp-migration.sh runcloud@YOUR_SERVER myapp
+# Different app:     ./wp-migration.sh runcloud@YOUR_SERVER myapp newapp
+# With staging URL:  ./wp-migration.sh runcloud@YOUR_SERVER myapp --staging-url=http://myapp.temp-site.link
+# Setup SSH keys:    ./wp-migration.sh runcloud@YOUR_SERVER --setup-ssh
 
 set -euo pipefail
 

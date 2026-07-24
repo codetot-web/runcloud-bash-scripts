@@ -37,7 +37,7 @@ In `runcloud-go/internal/web/server.go`, use `{name}` and `{path}` placeholders 
 
 ## Testing
 - Syntax check: `bash -n script.sh`
-- Test on a single server: `scp -P 2018 script.sh root@sg9.codetot.org:/root/test.sh && ssh -p 2018 root@sg9.codetot.org "bash /root/test.sh --site=vinhhoan"`
+- Test on a single server: `scp -P PORT script.sh root@YOUR_SERVER:/root/test.sh && ssh -p PORT root@YOUR_SERVER "bash /root/test.sh --site=SITE_NAME"`
 - Always test before merge+deploy
 
 ## Common pitfalls

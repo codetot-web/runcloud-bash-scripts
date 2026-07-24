@@ -7,11 +7,11 @@
 # verifies each site returns HTTP 200.
 #
 # Usage:
-#   ./wp-plugin-push.sh --plugin=gravityforms --server=sg3.codetot.org
-#   ./wp-plugin-push.sh --plugin=gravityforms --servers=sg3,sg5,vn01
+#   ./wp-plugin-push.sh --plugin=gravityforms --server=YOUR_SERVER
+#   ./wp-plugin-push.sh --plugin=gravityforms --servers=sv1,sv2,vn01
 #   ./wp-plugin-push.sh --plugin=gravityforms --all-servers
-#   ./wp-plugin-push.sh --plugin=gravityforms --server=sg3.codetot.org --dry-run
-#   ./wp-plugin-push.sh --plugin=gravityforms --server=sg3.codetot.org --site=myapp
+#   ./wp-plugin-push.sh --plugin=gravityforms --server=YOUR_SERVER --dry-run
+#   ./wp-plugin-push.sh --plugin=gravityforms --server=YOUR_SERVER --site=myapp
 #
 # Options:
 #   --plugin=SLUG            Required. Plugin slug (folder/zip name inside --plugins-dir)
@@ -30,34 +30,19 @@
 
 set -euo pipefail
 
-# --- Built-in server list (from SERVERS.md) ---
-# Format: "hostname:port" — stored as plain strings to avoid bash associative array issues
+# --- Built-in server list (from SERVERS.md, commented out for security) ---
+# Run: sqlite3 ~/.rc/rc.db "SELECT hostname || ':' || ssh_port FROM servers;" 2>/dev/null
+# Or define SERVER_LIST below (one "hostname:port" per line):
 SERVER_LIST=(
-    "sg2.codetot.org:22"
-    "sg3.codetot.org:22"
-    "sg5.codetot.org:22"
-    "sg6.codetot.org:22"
-    "sg7.codetot.org:22"
-    "sg8.codetot.org:22"
-    "sg9.codetot.org:2018"
-    "jp1.codetot.org:22"
-    "vn01.codetot.org:2018"
-    "vn02.codetot.org:2018"
-    "vn03.codetot.org:2018"
-    "vn04.codetot.org:2018"
-    "vn05.codetot.org:22"
-    "vn06.codetot.org:22"
-    "vn07.codetot.org:22"
-    "vn08.codetot.org:2018"
-    "vn09.codetot.org:22"
-    "vn10.codetot.org:2018"
-    "vn11.codetot.org:22"
-    "vn16.codetot.org:2018"
+    # "sg2.example.com:22"
 )
+# If SERVER_LIST is empty, --all-servers falls back to the servers DB.
+# Populate via: sqlite3 ~/.rc/rc.db "SELECT hostname || ':' || ssh_port FROM servers;"
 
-# Look up the SSH port for a hostname from SERVER_LIST
+# Look up the SSH port for a hostname from SERVER_LIST, or query the servers DB
 server_port() {
     local host="$1"
+    # Try SERVER_LIST first
     for entry in "${SERVER_LIST[@]}"; do
         if [ "${entry%%:*}" = "$host" ]; then
             echo "${entry##*:}"
@@ -134,12 +119,22 @@ fi
 TARGET_SERVERS=()
 
 if [ "$USE_ALL_SERVERS" = true ]; then
-    TARGET_SERVERS=("${ALL_SERVERS[@]}")
+    if [ ${#ALL_SERVERS[@]} -gt 0 ]; then
+        TARGET_SERVERS=("${ALL_SERVERS[@]}")
+    elif command -v sqlite3 &>/dev/null && [ -f ~/.rc/rc.db ]; then
+        # Fallback: query runcloud-go servers DB
+        while IFS='|' read -r host port; do
+            [ -n "$host" ] && TARGET_SERVERS+=("$host")
+        done < <(sqlite3 ~/.rc/rc.db "SELECT hostname, ssh_port FROM servers;" 2>/dev/null)
+    else
+        error "No servers configured. Set SERVER_LIST in this script or create ~/.rc/rc.db"
+        exit 1
+    fi
 elif [ -n "$SERVERS_INPUT" ]; then
     IFS=',' read -ra raw_list <<< "${SERVERS_INPUT%,}"
     for entry in "${raw_list[@]}"; do
         entry="${entry// /}"
-        # Expand short names (e.g. "sg3" → "sg3.codetot.org")
+        # Expand short names (e.g. "sv1" → "sv1.example.com")
         if [[ "$entry" != *"."* ]]; then
             entry="${entry}.codetot.org"
         fi

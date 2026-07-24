@@ -30,10 +30,10 @@
 #   --setup-ssh          Set up SSH key auth, then exit
 #
 # Examples:
-# Same app name:    ./laravel-migration.sh runcloud@sg4.codetot.org myapp
-# Different app:    ./laravel-migration.sh runcloud@sg4.codetot.org myapp newapp
-# With staging URL: ./laravel-migration.sh runcloud@sg4.codetot.org myapp --staging-url=http://staging.tld
-# Setup SSH keys:   ./laravel-migration.sh runcloud@sg4.codetot.org --setup-ssh
+# Same app name:    ./laravel-migration.sh runcloud@YOUR_SERVER myapp
+# Different app:    ./laravel-migration.sh runcloud@YOUR_SERVER myapp newapp
+# With staging URL: ./laravel-migration.sh runcloud@YOUR_SERVER myapp --staging-url=http://staging.tld
+# Setup SSH keys:   ./laravel-migration.sh runcloud@YOUR_SERVER --setup-ssh
 
 set -euo pipefail
 

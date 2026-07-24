@@ -1,7 +1,7 @@
 Test a bash script on a single production server before deploying fleet-wide.
 
 Usage: /test-script <script-name> <server> <args>
-Example: /test-script wp-vuln-check.sh sg9.codetot.org --site=vinhhoan
+Example: /test-script wp-vuln-check.sh YOUR_SERVER --site=SITE_NAME
 
 Steps:
 1. Run `bash -n <script>` locally to check syntax
