@@ -2,6 +2,24 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
+## [1.4.0] — 2026-07-24
+
+### Added
+
+- **litesoup/Apache compatibility** — Both `cleanup-disk.sh` and `install-ioncube.sh`
+  now work on Apache + PHP-FPM stacks (Ondrej PPA / vanilla / litesoup).
+
+- **`cleanup-disk.sh`**: Added Divi/Builder cache (`wp-content/et-cache`) and apt
+  package cache cleanup (`apt-get autoclean`). LiteSpeed paths are silently skipped
+  on Apache hosts via existing `[ -d "$dir" ]` guards. (`cleanup-disk.sh`)
+
+- **`install-ioncube.sh`**: Added `install_standard()` function that detects
+  standard PHP-FPM services (`phpX.Y-fpm`), finds extension dirs via
+  `php-configX.Y --extension-dir`, writes ini to
+  `/etc/php/X.Y/mods-available/`, enables via `phpenmod`, and reloads FPM
+  gracefully. Runs alongside existing OpenLiteSpeed and RunCloud installers
+  — auto-detects which stacks are present. (`install-ioncube.sh`)
+
 ## [1.3.0] — 2026-07-16
 
 ### Added
