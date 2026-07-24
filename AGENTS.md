@@ -4,9 +4,9 @@ Server management scripts for RunCloud-managed WordPress hosting fleet.
 
 ## Architecture
 
-- **20 production servers** across SG, VN, JP regions (see `~/.rc/config.yaml`)
+- **Multi-server fleet**: servers managed via `~/.rc/config.yaml` (SSH, ports, regions)
 - **Multi-user**: apps live under `/home/*/webapps/`, not just `/home/runcloud/`
-- **SSH access**: all servers via root, ports vary (22 or 2018, defined in config)
+- **SSH access**: all servers via root, port defined per server in config
 - **Git-tracked**: repo cloned at `/root/runcloud-bash-scripts/` on every server
 - **Dashboard integration**: scripts registered as actions in `runcloud-go/internal/web/server.go` `appScripts` map
 
