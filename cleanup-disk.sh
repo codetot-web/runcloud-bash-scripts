@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# cleanup-disk.sh — Free up disk space on RunCloud servers
+# cleanup-disk.sh — Free up disk space on RunCloud/litesoup servers
 #
-# Cleans LiteSpeed caches, swap files, journal logs, and optional
-# WordPress plugin caches. Safe to run manually or via cron.
+# Cleans WP caches (generic + provider-specific), swap files, journal logs.
+# Safe to run manually or via cron. LiteSpeed-specific paths are silently
+# skipped on Apache/litesoup hosts (dir-not-found guard).
 #
 # Usage:
 #   ./cleanup-disk.sh                    # Clean all webapps + system
@@ -12,16 +13,18 @@
 #   ./cleanup-disk.sh --dry-run          # Show what would be cleaned without deleting
 #
 # What it cleans:
-#   WordPress app:
+#   WordPress app (all stacks):
 #     - wp-content/cache/*
-#     - wp-content/litespeed/cssjs/*
 #     - wp-content/wpvivid_image_optimization/*
+#     - wp-content/et-cache/*            (Divi/Builderキャッシュ)
+#     - wp-content/litespeed/cssjs/*     (LiteSpeed plugin cache; no-op on Apache)
 #   System:
-#     - /tmp/lsws-rc/swap/*              (LiteSpeed swap files)
-#     - /home/runcloud/lscaches/*/        (LiteSpeed external caches)
+#     - /tmp/lsws-rc/swap/*              (LiteSpeed swap; no-op on Apache)
+#     - /home/runcloud/lscaches/*/        (LiteSpeed external caches; no-op on Apache)
 #     - journalctl vacuum to 500M        (systemd journal logs)
+#     - apt package cache (apt-get autoclean)
 #
-# Cron examples (add via RunCloud Dashboard > Cron Job):
+# Cron examples (add via RunCloud Dashboard or systemd timer):
 #   Daily WP cache:   0 0 * * *   /root/runcloud-bash-scripts/cleanup-disk.sh
 #   Weekly system:    0 0 * * 0   /root/runcloud-bash-scripts/cleanup-disk.sh --system-only
 #   Specific app:     0 0 * * *   /root/runcloud-bash-scripts/cleanup-disk.sh --site=myapp
@@ -102,7 +105,8 @@ if [ "$SYSTEM_ONLY" = false ]; then
 
         echo "--- App: $app_name ---"
         clean_dir "$app_path/wp-content/cache" "WP cache"
-        clean_dir "$app_path/wp-content/litespeed/cssjs" "LiteSpeed CSS/JS cache"
+        clean_dir "$app_path/wp-content/et-cache" "Divi/Builder cache"
+        clean_dir "$app_path/wp-content/litespeed/cssjs" "LiteSpeed CSS/JS cache (no-op on Apache)"
         clean_dir "$app_path/wp-content/wpvivid_image_optimization" "WPvivid optimization cache"
     }
 
@@ -155,11 +159,22 @@ else
     # Journal logs
     if command -v journalctl &>/dev/null; then
         if [ "$DRY_RUN" = true ]; then
-            local_journal_size=$(journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+[GMKT]' || echo "unknown")
+            local_journal_size=$(journalctl --disk-usage 2>/dev/null | grep -oP '[\\d.]+[GMKT]' || echo "unknown")
             echo "[DRY RUN] Would vacuum journal logs to $JOURNAL_MAX (current: $local_journal_size)"
         else
             echo "Vacuuming journal logs to $JOURNAL_MAX..."
             journalctl --vacuum-size="$JOURNAL_MAX" 2>&1 | tail -3
+        fi
+    fi
+
+    # Apt cache
+    if command -v apt-get &>/dev/null; then
+        if [ "$DRY_RUN" = true ]; then
+            local_apt_cache=$(du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || echo "0")
+            echo "[DRY RUN] Would autoclean apt package cache (current: $local_apt_cache)"
+        else
+            echo "Cleaning apt package cache..."
+            apt-get autoclean -qq 2>/dev/null || true
         fi
     fi
 fi
