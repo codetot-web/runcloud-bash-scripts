@@ -1,18 +1,19 @@
 #!/bin/bash
 #
 # WordPress Security Audit Script
-# Usage: wp-security-audit.sh [--site=APPNAME] [--folder=/path/to/webapp] [--install-deps]
+# Usage: wp-security-audit.sh [--site=APPNAME] [--folder=/path/to/webapp]
 #   --site=NAME      Scan a single site by app name (resolves to /home/*/webapps/NAME)
 #   --folder=PATH    Scan a specific folder path
-#   --install-deps   Install missing dependencies (clamav, rkhunter, chkrootkit)
 #   (no args)        Scan all sites under /home/*/webapps/*
 #
-# Two-phase scan:
-#   Phase 1 — Fast patterns: goods.php, shop.php, .tmb/, ZEa/, wp-login backdoor
-#   Phase 2 — Deep scan: ClamAV + rootkit checks (if tools installed)
+# Single-phase scan — fast pattern detection only:
+#   goods.php, shop.php, .tmb/, ZEa/, wp-login backdoor, obfuscated files,
+#   WP core integrity, suspicious cron hooks, uploads audit.
+#
+# NOTE: ClamAV/rootkit deep scan removed (2026-08-05) — causes high CPU load
+# on production servers. Rely on LiteSoup WAF + Apache hardening instead.
 
 DATE=$(date '+%Y-%m-%d %H:%M:%S')
-INSTALL_DEPS=false
 
 # Color output
 red()   { echo -e "\033[31m$1\033[0m"; }
@@ -38,38 +39,11 @@ for arg in "$@"; do
     --folder=*)
       SCANPATHS="${arg#*=}"
       ;;
-    --install-deps)
-      INSTALL_DEPS=true
-      ;;
   esac
 done
 
 # Ensure log directory exists
 mkdir -p /var/log/webapps
-
-# --- Dependency install ---
-if [ "$INSTALL_DEPS" = true ]; then
-  echo "[+] Installing ClamAV + rkhunter + chkrootkit..."
-  apt-get update -y
-  apt-get install -y clamav clamav-daemon rkhunter chkrootkit
-  freshclam 2>/dev/null || true
-  echo "[+] Dependencies installed."
-fi
-
-# --- Check required packages (soft warn, no exit) ---
-CLAMAV_AVAIL=false
-RKHUNTER_AVAIL=false
-CHKROOTKIT_AVAIL=false
-
-command -v clamscan >/dev/null 2>&1 && CLAMAV_AVAIL=true
-command -v rkhunter >/dev/null 2>&1 && RKHUNTER_AVAIL=true
-command -v chkrootkit >/dev/null 2>&1 && CHKROOTKIT_AVAIL=true
-
-if ! $CLAMAV_AVAIL && ! $RKHUNTER_AVAIL && ! $CHKROOTKIT_AVAIL; then
-  yellow "[!] No security tools installed (clamav, rkhunter, chkrootkit)."
-  yellow "    Run with --install-deps as root, or install manually."
-  yellow "    Phase 1 (fast pattern checks) will still run.\n"
-fi
 
 # ======================================================================
 # Phase 1: Fast Malware Pattern Detection
@@ -278,34 +252,6 @@ for SCANPATH in $SCANPATHS; do
         ISSUES=$((ISSUES+1))
       fi
     fi
-  fi
-
-  # ---- Phase 2: Deep Scan (tools required) ----
-  echo ""
-  echo "--- Phase 2: Deep Scan (ClamAV + Rootkit) ---"
-
-  if $CLAMAV_AVAIL; then
-    echo "[ClamAV Scan] (low priority — nice 19, ionice idle)"
-    ionice -c 2 -n 7 nice -n 19 clamscan -r "$SCANPATH" --bell -i \
-      --exclude-dir="^$SCANPATH/wp-content/cache" \
-      --max-filesize=100M --max-scansize=200M \
-      2>&1 | tee -a "$LOGFILE" | tail -5
-  else
-    yellow "[SKIP] ClamAV not installed"
-  fi
-
-  if $RKHUNTER_AVAIL; then
-    echo "[Rkhunter]"
-    rkhunter --check --sk 2>&1 | tee -a "$LOGFILE" | tail -3
-  else
-    yellow "[SKIP] rkhunter not installed"
-  fi
-
-  if $CHKROOTKIT_AVAIL; then
-    echo "[Chkrootkit]"
-    chkrootkit 2>&1 | tee -a "$LOGFILE" | tail -3
-  else
-    yellow "[SKIP] chkrootkit not installed"
   fi
 
   # ---- Uploads folder audit ----

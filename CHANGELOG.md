@@ -2,6 +2,18 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
+## [v0.0.2.1] — 2026-08-05
+
+### Changed
+
+- **Remove ClamAV/rootkit deep scan** from `wp-security-audit.sh` and
+  `wp-security-audit-installer.sh`. The ClamAV + rkhunter + chkrootkit deep
+  scan caused high CPU load on production servers (see litesoup work item #4).
+  The audit now runs fast pattern detection only (malware shells, obfuscated
+  files, WP core integrity, suspicious cron hooks, uploads audit) — no extra
+  packages required. Removed the `--install-deps` flag and the dependency
+  availability checks. Security relies on LiteSoup WAF + Apache hardening.
+
 ## [v0.0.2.0] — 2026-07-24
 
 ### Added

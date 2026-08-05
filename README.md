@@ -222,7 +222,9 @@ Install ioncube loader for all PHP versions.
 
 ### wp-security-audit-installer.sh / wp-security-audit.sh
 
-Install and run WordPress security audits.
+Install and run WordPress security audits (fast pattern detection: malware shells, obfuscated files, WP core integrity, suspicious cron hooks, uploads audit).
+
+> **Note:** ClamAV/rootkit deep scan was removed (2026-08-05) — it caused high CPU load on production servers. The audit now relies on fast pattern checks + LiteSoup WAF + Apache hardening.
 
 ```bash
 ./wp-security-audit-installer.sh
