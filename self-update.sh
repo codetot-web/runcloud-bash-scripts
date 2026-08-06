@@ -20,6 +20,12 @@ fi
 
 cd "$SCRIPT_DIR"
 
+# Ignore file mode changes (chmod +x from previous runs creates dirty state)
+git config core.fileMode false
+
+# Discard any local mode-only changes that would block git pull
+git checkout -- . 2>/dev/null || true
+
 # Fetch and check for updates
 git fetch origin main --quiet 2>/dev/null
 
