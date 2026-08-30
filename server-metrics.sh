@@ -189,10 +189,15 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
             fi
             # Method 4: LiteSoup / Apache + PHP-FPM — read the vhost's proxy fcgi socket.
             # LiteSoup (Apache) vhosts declare `SetHandler "proxy:unix:/run/php/litesoup-php8.2-fpm.sock|fcgi://localhost"`.
-            # The vhost file name matches the webapp name: /etc/apache2/sites-enabled/<app>.conf.
+            # Match the vhost file by webapp name, then by ServerName/ServerAlias (webapp_name may
+            # differ from the domain, e.g. webapp "hih" -> vhost "hih.vn.conf").
             if [ -z "$php_ver" ] && [ -d /etc/apache2/sites-enabled ]; then
                 vhost_conf="/etc/apache2/sites-enabled/${webapp_name}.conf"
-                if [ -f "$vhost_conf" ]; then
+                if [ ! -f "$vhost_conf" ]; then
+                    vhost_conf=$(grep -lE "Server(Name|Alias)[[:space:]]+${webapp_name}(\.|$|[[:space:]])" \
+                        /etc/apache2/sites-enabled/*.conf 2>/dev/null | head -1)
+                fi
+                if [ -n "$vhost_conf" ] && [ -f "$vhost_conf" ]; then
                     lsphp_ver=$(grep -oP 'php\K[0-9]+\.[0-9]+(?=-fpm\.sock)' "$vhost_conf" 2>/dev/null | head -1)
                     [ -n "$lsphp_ver" ] && php_ver="$lsphp_ver"
                 fi
