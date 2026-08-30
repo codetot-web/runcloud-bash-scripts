@@ -177,6 +177,16 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                     fi
                 fi
             fi
+            # Method 3: RunCloud OpenLiteSpeed — read the site's handler.conf (lsphp path).
+            # RunCloud OLS stores per-site vhost config under /etc/lsws-rc/conf.d/<app>.d/handler.conf
+            # with a `path /usr/local/lsws/lsphpNN/bin/lsphp` line giving the ACTUAL serving PHP.
+            # (Methods 1-2 only cover FPM stacks; OLS has no /etc/phpXYrc/fpm.d pools nor /run/*.sock.)
+            if [ -z "$php_ver" ] && [ -f "/etc/lsws-rc/conf.d/${webapp_name}.d/handler.conf" ]; then
+                lsphp_ver=$(grep -oP 'path\s+/usr/local/lsws/lsphp\K[0-9]+(?=/bin/lsphp)' "/etc/lsws-rc/conf.d/${webapp_name}.d/handler.conf" 2>/dev/null | head -1)
+                if [ -n "$lsphp_ver" ]; then
+                    php_ver=$(echo "$lsphp_ver" | sed 's/^\(.\)/\1./')
+                fi
+            fi
             if [ -n "$php_ver" ]; then
                 php_field=",\"php_version\":\"$php_ver\""
             fi
