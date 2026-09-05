@@ -195,7 +195,7 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 vhost_conf="/etc/apache2/sites-enabled/${webapp_name}.conf"
                 if [ ! -f "$vhost_conf" ]; then
                     vhost_conf=$(grep -lE "Server(Name|Alias)[[:space:]]+${webapp_name}(\.|$|[[:space:]])" \
-                        /etc/apache2/sites-enabled/*.conf 2>/dev/null | head -1)
+                        /etc/apache2/sites-enabled/*.conf 2>/dev/null | head -1 || true)
                 fi
                 if [ -n "$vhost_conf" ] && [ -f "$vhost_conf" ]; then
                     lsphp_ver=$(grep -oP 'php\K[0-9]+\.[0-9]+(?=-fpm\.sock)' "$vhost_conf" 2>/dev/null | head -1)
