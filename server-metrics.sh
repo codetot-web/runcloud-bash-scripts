@@ -149,6 +149,33 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 fi
             fi
 
+            # Real domain for non-WordPress apps (and WP fallback if wp-cli couldn't
+            # read siteurl): derive it from the vhost config so rc-go records the
+            # actual domain for Laravel/php apps too (e.g. webapp "caster" ->
+            # vhost "caster.mlbb.playfun.vn.conf"). Match the vhost by DOCROOT (the
+            # app path) or by ServerName/ServerAlias (webapp_name may differ from
+            # the domain). Emit it as wp_siteurl.
+            if ! echo "$wp_fields" | grep -q '"wp_siteurl"'; then
+                vhost_conf=""
+                for vdir in /etc/litesoup/vhost /etc/apache2/sites-enabled; do
+                    [ -d "$vdir" ] || continue
+                    vhost_conf=$(grep -l "DOCROOT=${app_path}$" "$vdir"/*.conf 2>/dev/null | head -1 || true)
+                    if [ -z "$vhost_conf" ]; then
+                        vhost_conf=$(grep -lE "Server(Name|Alias)[[:space:]]+${webapp_name}(\.|$|[[:space:]])" "$vdir"/*.conf 2>/dev/null | head -1 || true)
+                    fi
+                    [ -n "$vhost_conf" ] && break
+                done
+                if [ -n "$vhost_conf" ] && [ -f "$vhost_conf" ]; then
+                    real_domain=$(grep -oP '^DOMAIN=\K.*' "$vhost_conf" 2>/dev/null | head -1 || true)
+                    if [ -z "$real_domain" ]; then
+                        real_domain=$(grep -oP 'ServerName[[:space:]]+\K[^[:space:]]+' "$vhost_conf" 2>/dev/null | head -1 || true)
+                    fi
+                    if [ -n "$real_domain" ]; then
+                        wp_fields="$wp_fields,\"wp_siteurl\":\"https://$real_domain\""
+                    fi
+                fi
+            fi
+
             # PHP version detection — check FPM pool config to find the actual web PHP version
             php_field=""
             php_ver=""
