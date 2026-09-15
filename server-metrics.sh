@@ -159,7 +159,7 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                 vhost_conf=""
                 for vdir in /etc/litesoup/vhost /etc/apache2/sites-enabled; do
                     [ -d "$vdir" ] || continue
-                    vhost_conf=$(grep -l "DOCROOT=${app_path}$" "$vdir"/*.conf 2>/dev/null | head -1 || true)
+                    vhost_conf=$(grep -lE "DOCROOT=${app_path}(/|$)" "$vdir"/*.conf 2>/dev/null | head -1 || true)
                     if [ -z "$vhost_conf" ]; then
                         vhost_conf=$(grep -lE "Server(Name|Alias)[[:space:]]+${webapp_name}(\.|$|[[:space:]])" "$vdir"/*.conf 2>/dev/null | head -1 || true)
                     fi
