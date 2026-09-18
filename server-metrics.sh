@@ -188,17 +188,17 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
             done
             # Method 2: check FPM socket and trace to master process
             if [ -z "$php_ver" ] && [ -S "/run/${webapp_name}.sock" ] || [ -S "/var/run/${webapp_name}.sock" ]; then
-                worker_pid=$(pgrep -f "pool $webapp_name" 2>/dev/null | head -1)
+                worker_pid=$(pgrep -f "pool $webapp_name" 2>/dev/null | head -1 || true)
                 if [ -n "$worker_pid" ]; then
                     master_pid=$(awk '/^PPid:/{print $2}' /proc/"$worker_pid"/status 2>/dev/null)
                     if [ -n "$master_pid" ]; then
                         master_conf=$(tr '\0' ' ' < /proc/"$master_pid"/cmdline 2>/dev/null)
                         # Extract version from config path like /etc/php74rc/php-fpm.conf or /etc/php/8.2/fpm/php-fpm.conf
-                        ver_from_conf=$(echo "$master_conf" | grep -oP 'php\K[0-9]+(?=rc/)' | head -1)
+                        ver_from_conf=$(echo "$master_conf" | grep -oP 'php\K[0-9]+(?=rc/)' | head -1 || true)
                         if [ -n "$ver_from_conf" ]; then
                             php_ver=$(echo "$ver_from_conf" | sed 's/\(.\)\(.\)/\1.\2/')
                         else
-                            ver_from_conf=$(echo "$master_conf" | grep -oP 'php/\K[0-9]+\.[0-9]+' | head -1)
+                            ver_from_conf=$(echo "$master_conf" | grep -oP 'php/\K[0-9]+\.[0-9]+' | head -1 || true)
                             [ -n "$ver_from_conf" ] && php_ver="$ver_from_conf"
                         fi
                     fi
@@ -209,7 +209,7 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
             # with a `path /usr/local/lsws/lsphpNN/bin/lsphp` line giving the ACTUAL serving PHP.
             # (Methods 1-2 only cover FPM stacks; OLS has no /etc/phpXYrc/fpm.d pools nor /run/*.sock.)
             if [ -z "$php_ver" ] && [ -f "/etc/lsws-rc/conf.d/${webapp_name}.d/handler.conf" ]; then
-                lsphp_ver=$(grep -oP 'path\s+/usr/local/lsws/lsphp\K[0-9]+(?=/bin/lsphp)' "/etc/lsws-rc/conf.d/${webapp_name}.d/handler.conf" 2>/dev/null | head -1)
+                lsphp_ver=$(grep -oP 'path\s+/usr/local/lsws/lsphp\K[0-9]+(?=/bin/lsphp)' "/etc/lsws-rc/conf.d/${webapp_name}.d/handler.conf" 2>/dev/null | head -1 || true)
                 if [ -n "$lsphp_ver" ]; then
                     php_ver=$(echo "$lsphp_ver" | sed 's/^\(.\)/\1./')
                 fi
@@ -225,7 +225,7 @@ if [ "$QUICK_MODE" = false ] && [ -d /home ]; then
                         /etc/apache2/sites-enabled/*.conf 2>/dev/null | head -1 || true)
                 fi
                 if [ -n "$vhost_conf" ] && [ -f "$vhost_conf" ]; then
-                    lsphp_ver=$(grep -oP 'php\K[0-9]+\.[0-9]+(?=-fpm\.sock)' "$vhost_conf" 2>/dev/null | head -1)
+                    lsphp_ver=$(grep -oP 'php\K[0-9]+\.[0-9]+(?=-fpm\.sock)' "$vhost_conf" 2>/dev/null | head -1 || true)
                     [ -n "$lsphp_ver" ] && php_ver="$lsphp_ver"
                 fi
             fi
