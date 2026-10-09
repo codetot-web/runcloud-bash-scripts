@@ -467,7 +467,12 @@ git_commit() {
     if [ "$NO_GIT" = false ] && [ -d "$SITE_PATH/.git" ] && [ "$DRY_RUN" = false ]; then
         cd "$SITE_PATH"
         if ! git diff --quiet 2>/dev/null; then
-            sudo -u "$SITE_OWNER" git add -A 2>/dev/null || git add -A
+            # SECURITY (2026-10-09): never `git add -A` — it staged attacker shells
+            # (wp-includes/Text/Diff/Engine/go.php etc.) into the repo.
+            sudo -u "$SITE_OWNER" git add -A -- wp-content/plugins wp-content/themes wp-content/mu-plugins 2>/dev/null || \
+                git add -A -- wp-content/plugins wp-content/themes wp-content/mu-plugins 2>/dev/null || true
+            sudo -u "$SITE_OWNER" git add -- .gitignore 2>/dev/null || true
+            sudo -u "$SITE_OWNER" git reset -q -- wp-admin wp-includes wp-config.php .htaccess 2>/dev/null || true
             sudo -u "$SITE_OWNER" git commit -m "chore: wp-update $ACTION $(date +%Y-%m-%d)" --quiet 2>/dev/null || \
                 git commit -m "chore: wp-update $ACTION $(date +%Y-%m-%d)" --quiet 2>/dev/null || true
             success "Changes committed to git (as $SITE_OWNER)"
