@@ -80,3 +80,7 @@ All notable changes to `runcloud-bash-scripts` will be documented in this file.
 ### Added
 
 - Initial scripts: wp-health-check, wp-vuln-check, wp-update, wp-security-audit, litespeed-lockdown
+
+## 2026-10-14
+- New: `plugins-sync.sh` — compare a reference WP repo (e.g. `codetot-clients/masanconsumer`) against the local `~/plugins/` store; classify each plugin as aligned / behind / missing, and download the latest FREE plugin zip from api.wordpress.org. Premium plugins (rank-math-pro, perfmatters, wpvivid-backup-pro, etc.) are listed separately and must be obtained manually with a valid license.
+- New: `plugins/.gitkeep` — landing folder for the premium plugin zips. `wp-plugin-push.sh --plugins-dir` defaults to it.

@@ -1,0 +1,2 @@
+# Folder for premium plugin zips referenced by wp-plugin-push.sh.
+# See plugins-sync.sh in the repo root for the sync workflow.
