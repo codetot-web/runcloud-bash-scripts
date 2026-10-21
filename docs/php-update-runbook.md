@@ -32,7 +32,7 @@ systemctl list-units --type=service --state=running | grep -E 'php[0-9.]+(rc)?-f
 
 Ghi lại vào bảng: server, site, phiên bản PHP, hết hỗ trợ hay chưa. Một phiên bản đã cài nhưng không site nào dùng thì không phải rủi ro chính, nhưng cũng nên gỡ nếu không cần.
 
-Tra tình trạng hỗ trợ trên [php.net/supported-versions.php](https://www.php.net/supported-versions.php). Tại thời điểm viết (21/10/2026): 8.4 và 8.5 hỗ trợ đầy đủ, 8.2 và 8.3 chỉ vá bảo mật, 8.1 và 7.4 đã hết hỗ trợ.
+Tra tình trạng hỗ trợ trên [php.net/supported-versions.php](https://www.php.net/supported-versions.php). Tại 21/10/2026: 8.4 và 8.5 hỗ trợ đầy đủ, 8.2 và 8.3 chỉ vá bảo mật (8.2 hết vòng đời 31/12/2026), 8.1 và 7.4 đã hết hỗ trợ.
 
 ## Bước 2: xác định bản vá đến từ đâu
 
@@ -45,6 +45,16 @@ apt-cache policy <tên-gói-ở-lệnh-trên>
 
 Chỉ coi một gói là đã vá khi changelog của gói nhắc đến CVE cần vá hoặc phiên bản gói không thấp hơn phiên bản PHP mà php.net công bố đã sửa.
 Với gói của RunCloud, theo dõi thông báo của RunCloud. Đừng tự biên dịch PHP trên server đang chạy production.
+
+Với PHP-FPM chuẩn (hàng thứ ba trong bảng trên), kiểm tra máy đang lấy gói từ đâu, vì hai nguồn có thể lệch nhau vài giờ:
+
+```bash
+grep -rhE 'sury|ondrej' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null
+apt-cache policy php8.3-fpm | head -8
+```
+
+- `packages.sury.org` là kho chính của Ondrej Sury. Bản vá ngày 21/10/2026 đã có ở đây.
+- `ppa.launchpadcontent.net/ondrej/php` (PPA Launchpad) là bản mirror, có thể về chậm hơn vài giờ. Máy dùng PPA cần chờ, hoặc chuyển sang kho `packages.sury.org` theo hướng dẫn của Ondrej.
 
 ## Bước 3: chuẩn bị trước khi vá
 
@@ -87,7 +97,9 @@ Mã thoát `0` nghĩa là mọi site ok. Sau đó kiểm tra bằng tay một si
 
 ## Bước 6: phiên bản hết hỗ trợ (7.4, 8.1 và cũ hơn)
 
-Phiên bản hết hỗ trợ không nhận bản vá chính thức. Ưu tiên theo thứ tự:
+PHP không còn phát hành bản chính thức cho các nhánh này. Ngoại lệ cần kiểm tra: kho `packages.sury.org` đã có gói `php7.4-fpm` bản `7.4.33-31` (build 21/10/2026, cùng ngày với bản vá). Gói do Ondrej Sury xây dựng, không phải bản phát hành của PHP.
+Chỉ coi máy là đã vá khi `apt changelog php7.4-fpm` nhắc đến CVE-2026-109618 và CVE-2026-109619 (hoặc nguồn của Sury xác nhận). Áp dụng cho máy dùng PHP-FPM chuẩn từ Sury; gói PHP của RunCloud là kênh riêng.
+Dù có bản backport, 7.4 vẫn là nhánh đã chết nhiều năm: coi đó là biện pháp tạm và vẫn lên kế hoạch nâng nhánh. Ưu tiên theo thứ tự:
 
 1. Chuyển site sang phiên bản PHP được hỗ trợ trong RunCloud panel, kiểm tra bằng staging, rồi chuyển thật.
 2. Nếu chưa chuyển kịp: giới hạn truy cập (VPN, IP whitelist, Cloudflare WAF) hoặc tạm ngừng public site đó.
@@ -97,11 +109,19 @@ Không chặn cổng 80 của cả server để "cho an toàn". Làm vậy sẽ 
 
 ## Khi có đợt vá khẩn cấp (ví dụ CVE-2026-109618 và CVE-2026-109619)
 
-PHP lên lịch phát hành lúc 14:00 UTC ngày 21/10/2026 (21:00 giờ Việt Nam). Tại thời điểm viết, PHP chưa công bố phiên bản bị ảnh hưởng và phiên bản đã vá.
+PHP đã phát hành bản vá ngày 21/10/2026 ([thông báo](https://www.php.net/archive/2026.php#2026-10-21-5)). Cả hai lỗi là RCE không cần xác thực, CVSS v4.0 9.2, ảnh hưởng mọi bản cài PHP phục vụ request web.
 
-1. Trước giờ phát hành: hoàn thành bước 1 và 3.
-2. Đọc [thông báo trên php.net](https://www.php.net/archive/2026.php#2026-10-20-1) để biết phiên bản bị ảnh hưởng và phiên bản vá.
-3. Đối chiếu với nhà cung cấp gói (bước 2). Chưa có gói thì chưa vá được; áp dụng bước 6 cho phiên bản hết hỗ trợ.
+| Nhánh         | Phiên bản cần có                               |
+| ------------- | ---------------------------------------------- |
+| 8.5           | 8.5.12 trở lên                                 |
+| 8.4           | 8.4.27 trở lên                                 |
+| 8.3           | 8.3.36 trở lên                                 |
+| 8.2           | 8.2.35 trở lên                                 |
+| 8.1 và cũ hơn | Không có bản phát hành chính thức (xem bước 6) |
+
+1. Hoàn thành bước 1 và 3 (kiểm kê, sao lưu).
+2. Xác định kho gói của từng máy (bước 2). Máy dùng PPA Launchpad có thể chưa thấy gói mới; kho `packages.sury.org` đã có (8.3.36 đã được xác nhận trên kho này).
+3. Gói RunCloud: chỉ coi là đã vá khi `/RunCloud/Packages/phpXYrc/bin/php -v` báo phiên bản trong bảng trên. Chưa có thì theo dõi thông báo của RunCloud và dùng biện pháp ở [security-runbook.md](security-runbook.md).
 4. Vá từng server theo bước 4, thử trên server ít quan trọng trước.
 5. Theo dõi tiến trình PHP sinh shell (xem [security-runbook.md](security-runbook.md)).
 
