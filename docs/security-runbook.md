@@ -4,7 +4,7 @@
 
 | Tình huống                                             | Hành động đầu tiên                                                                |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
-| Cảnh báo lỗ hổng PHP hoặc web server (chưa có bản vá)  | Kiểm kê phiên bản, xem [php-update-runbook.md](php-update-runbook.md)             |
+| Cảnh báo lỗ hổng PHP hoặc web server (đợt 21/10/2026: vá ở 8.5.12, 8.4.27, 8.3.36, 8.2.35)  | Kiểm kê phiên bản, xem [php-update-runbook.md](php-update-runbook.md)             |
 | Cảnh báo lỗ hổng plugin, theme, core                   | `./wp-vuln-check.sh --site=myapp --include-core` rồi cập nhật bằng `wp-update.sh` |
 | Nghi ngờ site bị chèn mã, trang lạ, redirect lạ        | Mục "Nghi ngờ bị xâm nhập" bên dưới                                               |
 | Tiến trình PHP sinh shell, kết nối ra ngoài bất thường | Cô lập server, giữ log, xem mục "Nghi ngờ bị xâm nhập"                            |
