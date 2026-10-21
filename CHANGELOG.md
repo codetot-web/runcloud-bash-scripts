@@ -2,6 +2,22 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
+## [v0.0.3.0] — 2026-10-21
+
+### Added
+
+- **`php-cve-mitigation.sh`** — set `session.upload_progress.enabled = Off`
+  on every PHP install: RunCloud `phpXXrc` (Nginx), OpenLiteSpeed `lsphpXX`
+  and Ubuntu/Ondrej `/etc/php/<X.Y>`, found by globbing and by asking each
+  PHP binary for its loaded php.ini. Patches `conf.d` files that turn it On,
+  reports `fpm.d` pool / `.user.ini` / `.htaccess` overrides. `--audit`,
+  `--dry-run`, `--rollback` (newest timestamped backup). `php-fpm -t` before
+  reload; LiteSpeed via `lswsctrl` (unit `lsws-rc`) plus stopping detached
+  `lsphp` workers. Exits 1 when a service could not be reloaded. Defence in
+  depth for the October 2026 PHP core advisory — not a fix. Shared with
+  `codetot/ec2-bash-scripts`.
+- `tests/php-cve-mitigation.test.sh` — function tests on fake ini files.
+
 ## [v0.0.2.1] — 2026-08-05
 
 ### Changed

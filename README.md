@@ -12,6 +12,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 
 ## Features
 - [x] Install ioncube for all PHP versions
+- [x] PHP CVE mitigation (`session.upload_progress.enabled = Off` on every PHP install)
 - [x] Migrate WordPress and Laravel apps between RunCloud servers
 - [x] Fix web applications permission (runcloud chown, file 644 folder 755)
 - [x] Chown a webapp tree to www-data while preserving wp-content/uploads
@@ -227,6 +228,35 @@ Install ioncube loader for all PHP versions.
 ```bash
 ./install-ioncube.sh
 ```
+
+### php-cve-mitigation.sh
+
+Turn `session.upload_progress.enabled` Off on every PHP install of the
+server — defence in depth for the October 2026 PHP core advisory (two
+critical flaws, CVSS 9.2, release 2026-10-21 14:00 UTC; third-party
+research ties them to a session.upload_progress trigger path). **Not a
+fix:** update PHP from RunCloud once the patched builds are available.
+
+Covers RunCloud Nginx (`/etc/phpXXrc/php.ini`, `phpXXrc-fpm`),
+OpenLiteSpeed `lsphpXX` (ini asked from the binary; LiteSpeed restarted
+via `lswsctrl`, detached `lsphp` workers stopped so they respawn with
+the new ini) and Ubuntu/Ondrej `/etc/php/<X.Y>`. No version list — new
+PHP versions are picked up automatically. Patches `conf.d` files that
+turn the setting On and reports per-app `fpm.d` pool values,
+`.user.ini` and `.htaccess` under `/home/*/webapps`.
+
+```bash
+./php-cve-mitigation.sh --audit      # report only
+./php-cve-mitigation.sh --dry-run    # preview edits and reloads
+./php-cve-mitigation.sh              # apply + reload
+./php-cve-mitigation.sh --rollback   # restore the newest *.bak-pre-cve-<stamp> backups
+bash tests/php-cve-mitigation.test.sh
+```
+
+`php-fpm -t` runs before each reload; a service that could not be
+reloaded is listed as "NOT live" and the script exits 1. Side effect:
+session upload progress (progress bars polling `$_SESSION`) stops
+working while the setting is Off.
 
 ### wp-security-audit-installer.sh / wp-security-audit.sh
 
