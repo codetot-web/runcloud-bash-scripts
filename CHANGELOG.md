@@ -2,6 +2,58 @@
 
 All notable changes to `runcloud-bash-scripts` will be documented in this file.
 
+## [v0.0.2.2] — 2026-10-26
+
+### Added
+
+- **`wp-premium-update.sh`** — PHP-version-gated updater for premium (licensed)
+  plugins, installed from the private store `codetot-web/premium-plugins`
+  (deployed to servers at `/root/premium-plugins/`). For every (site, package)
+  it:
+  - reads the package's PHP floor from the `Requires PHP:` header **and**
+    `vendor/composer/platform_check.php` (composer throws at autoload, before any
+    plugin code runs, so the stricter of the two wins);
+  - detects the PHP version the site is **actually served by** — RunCloud nginx
+    `fpm.d`, RunCloud OLS `handler.conf`, or litesoup/Apache `proxy:fcgi` socket
+    (matched by vhost name, `ServerName`/`ServerAlias`, then `DocumentRoot`,
+    because webapp `dichvu-website` lives in `dichvu.website.conf`). Never
+    `php -v`: the CLI binary is routinely a different major than the web PHP;
+  - **BLOCKS** (writes nothing) when the site is below the floor, naming the
+    required version. No automatic override — `--allow-php-gate-bypass` is for
+    staging ahead of a planned PHP upgrade;
+  - **lints** the package's top-level PHP files with the *site's own* php binary
+    before installing, so a package that uses newer syntax than it advertises is
+    caught pre-install;
+  - blocks the site entirely if its PHP cannot be detected (a wrong PHP
+    assumption is what takes a site down).
+  Apply is dry-run by default; `--apply` keeps `<slug>.bak-<ts>`, moves the old
+  folder aside and extracts fresh (never on top), fixes ownership to the site
+  owner, re-reads the on-disk version, re-activates a previously-active plugin
+  and **verifies it is still active**, checks HTTP and **auto-rolls-back** on a
+  non-200/301/302, flushes caches, and commits per plugin.
+- `docs/premium-plugin-update.md` — gate rationale (the perfmatters 2.6.7 on
+  PHP 7.4 incident), store deployment by rsync, per-stack PHP detection, exit
+  codes, fleet rollout procedure.
+
+### Fixed
+
+- **Swallowed `git add` failure in the per-plugin commit path.** When
+  `.git/objects/<xx>` dirs are root-owned (a root `git fetch` leaves them that
+  way), `git add` fails with `insufficient permission for adding an object to
+  repository database` — and a bare `git diff --cached --quiet` then reports no
+  diff, which is indistinguishable from "nothing to commit". The update landed
+  on disk with no commit and the revert safety net silently did not exist. Any
+  output from `git add` is now treated as a failure, printed with the exact
+  `chown` to run.
+- **`version_cmp` compared only 3 components**, so Gravity Forms'
+  `3.1.3.4` vs `3.1.3.10` compared **equal** and a real update would have been
+  skipped. Now compares 4.
+- **`zip_entry_php` returned false negatives under `set -o pipefail`**:
+  `unzip -p … | grep -q 'Plugin Name:'` fails when grep exits early and unzip
+  takes SIGPIPE, so packages whose entry file was not first alphabetically
+  (Gravity Forms' `gravityforms.php`) read as having no version header. The body
+  is now captured before matching.
+
 ## [v0.0.2.1] — 2026-08-05
 
 ### Changed
