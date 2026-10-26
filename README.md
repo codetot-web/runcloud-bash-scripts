@@ -29,6 +29,7 @@ Author: [@khoipro](https://github.com/khoipro), @copilot
 - [x] WP vulnerability check (CVE scanning via WPVulnerability.net API)
 - [x] WP health check (FPM PHP binary probe — DB, plugin/theme fatals)
 - [x] WP ownership audit (detect root-owned files + ACL deny entries)
+- [x] Premium plugin updates **gated on the site's web PHP version** (blocks instead of white-screening)
 
 ## Requirements
 - OpenLitespeed/Nginx
@@ -597,6 +598,58 @@ Scans WordPress webapps for file ownership issues that silently break sites:
 ```bash
 ./wp-ownership-audit.sh --format=json
 ```
+
+### wp-premium-update.sh
+
+Update premium (licensed) plugins — WPML/OTGS, Gravity Forms, ACF PRO, Perfmatters,
+WooCommerce Multilingual — from the private store
+[`codetot-web/premium-plugins`](https://github.com/codetot-web/premium-plugins),
+deployed to `/root/premium-plugins/`.
+
+**The PHP version is a hard gate, not a warning.** Installing a package whose
+`Requires PHP` the site does not meet is a documented white-screen: perfmatters
+2.6.7 requires PHP 8.1 and auto-deactivated itself on five PHP 7.4 sites,
+killing their custom `/quantri/` login. Two failure signatures:
+
+```
+PHP Fatal error: Uncaught RuntimeException: Composer detected issues in your
+platform: Your Composer dependencies require a PHP version ">= 8.1.0".
+```
+
+```
+PHP Parse error: syntax error, unexpected '|'      <- PHP 8.0+ union types
+```
+
+For every (site, package) the script:
+
+1. reads the package floor from `Requires PHP:` **and**
+   `vendor/composer/platform_check.php` (composer throws before plugin code
+   runs, so the stricter wins);
+2. detects the PHP the site is **actually served by** — RunCloud nginx `fpm.d`,
+   RunCloud OLS `handler.conf`, or litesoup/Apache `proxy:fcgi` socket (vhost
+   name -> `ServerName`/`ServerAlias` -> `DocumentRoot`). It never uses `php -v`:
+   the CLI binary is routinely a different major than the web PHP;
+3. **BLOCKS** when the site is below the floor — nothing is written, and the
+   report names the required version. No automatic override;
+4. **lints** the package's PHP files with the site's own php binary before
+   installing, catching packages that use newer syntax than they advertise;
+5. blocks the whole site if its PHP cannot be detected — a wrong PHP assumption
+   is exactly what takes a site down.
+
+```bash
+sudo ./wp-premium-update.sh --all-sites                  # audit (dry-run, default)
+sudo ./wp-premium-update.sh --all-sites --apply          # apply what passes
+sudo ./wp-premium-update.sh --site=APP --plugin=perfmatters --apply
+sudo ./wp-premium-update.sh --all-sites --install --apply
+```
+
+On apply: keeps `<slug>.bak-<ts>`, moves the old folder aside and extracts
+fresh (never on top), fixes ownership to the site owner, re-reads the on-disk
+version, re-activates a previously-active plugin and verifies it stayed active,
+checks HTTP and **auto-rolls-back** on a non-200/301/302, flushes caches, and
+commits per plugin. Exit code 2 means something failed and was rolled back.
+
+Full runbook: [`docs/premium-plugin-update.md`](./docs/premium-plugin-update.md).
 
 ### change-ssh-port.sh
 
