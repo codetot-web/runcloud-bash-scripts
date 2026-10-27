@@ -145,23 +145,57 @@ version_compare() {
 }
 
 # Check if installed version is affected by a vulnerability operator
-# Args: installed_version max_version max_operator unfixed
+# Args: installed_version max_version max_operator min_version min_operator unfixed
+#
+# IMPORTANT — three rules the naive implementation got wrong (fixed 2026-10-14):
+#   1. `unfixed=1` on an `eq` (or ranged) operator means "no patch EXISTS for that
+#      narrow range" — NOT "every version is affected". Only when unfixed=1 AND there
+#      is no version constraint at all is the whole plugin affected. Example:
+#      "WooCommerce == 7.1.0 (unfixed)" must NOT flag WC 11.2.1.
+#   2. max_operator `eq` must be honoured (was falling through to `*) echo 0`).
+#   3. A LOWER bound (min_version/min_operator `ge`/`gt`) must be honoured, otherwise
+#      ranged advisories like `>= 9.8.0 - < 11.2.0` (CVE-2026-106608) are missed
+#      entirely — the scanner only ever looked at max_version.
 is_affected() {
-    local installed="$1" max_ver="$2" max_op="$3" unfixed="$4"
+    local installed="$1" max_ver="$2" max_op="$3" min_ver="${4:-}" min_op="${5:-}" unfixed="${6:-0}"
 
-    # Unfixed = all versions affected
-    if [ "$unfixed" = "1" ]; then echo 1; return; fi
+    # No constraint at all + unfixed → genuinely every version is affected.
+    if [ "$unfixed" = "1" ] && [ -z "$max_ver" ] && [ -z "$min_ver" ]; then
+        echo 1; return
+    fi
 
-    [ -z "$max_ver" ] && { echo 0; return; }
+    # With a constraint, an unfixed advisory still only covers its own range:
+    # fall through to the normal version comparison.
+    [ -z "$max_ver" ] && [ -z "$min_ver" ] && { echo 0; return; }
 
-    local cmp
-    cmp=$(version_compare "$installed" "$max_ver")
+    local cmp_max cmp_min
+    # Upper bound
+    if [ -n "$max_ver" ]; then
+        cmp_max=$(version_compare "$installed" "$max_ver")
+        case "$max_op" in
+            lt) [ "$cmp_max" -eq 0 ] || { echo 0; return; } ;;
+            le) [ "$cmp_max" -le 1 ] || { echo 0; return; } ;;
+            eq) [ "$cmp_max" -eq 1 ] || { echo 0; return; } ;;
+            gt) [ "$cmp_max" -eq 2 ] || { echo 0; return; } ;;
+            ge) [ "$cmp_max" -ge 1 ] || { echo 0; return; } ;;
+            *)  echo 0; return ;;
+        esac
+    fi
 
-    case "$max_op" in
-        lt) [ "$cmp" -eq 0 ] && echo 1 || echo 0 ;;
-        le) [ "$cmp" -le 1 ] && echo 1 || echo 0 ;;
-        *)  echo 0 ;;
-    esac
+    # Lower bound
+    if [ -n "$min_ver" ]; then
+        cmp_min=$(version_compare "$installed" "$min_ver")
+        case "$min_op" in
+            ge) [ "$cmp_min" -ge 1 ] || { echo 0; return; } ;;
+            gt) [ "$cmp_min" -eq 2 ] || { echo 0; return; } ;;
+            eq) [ "$cmp_min" -eq 1 ] || { echo 0; return; } ;;
+            le) [ "$cmp_min" -le 1 ] || { echo 0; return; } ;;
+            lt) [ "$cmp_min" -eq 0 ] || { echo 0; return; } ;;
+            *)  ;;
+        esac
+    fi
+
+    echo 1
 }
 
 # --- Check a single component against the API ---
@@ -207,6 +241,8 @@ try:
         op = v.get('operator', {}) or {}
         max_ver = op.get('max_version', '') or ''
         max_op = op.get('max_operator', '') or ''
+        min_ver = op.get('min_version', '') or ''
+        min_op = op.get('min_operator', '') or ''
         unfixed = op.get('unfixed', '0') or '0'
         # Get CVE
         cve = ''
@@ -227,7 +263,7 @@ try:
                 break
         name = v.get('name', '')
         uuid = v.get('uuid', '')
-        print(f'{uuid}|{name}|{max_ver}|{max_op}|{unfixed}|{cve}|{cvss}|{severity}')
+        print(f'{uuid}|{name}|{max_ver}|{max_op}|{min_ver}|{min_op}|{unfixed}|{cve}|{cvss}|{severity}')
 except:
     pass
 " <<< "$response"
@@ -252,9 +288,9 @@ if [ "$CHECK_CORE" = true ]; then
     wp_ver=$(grep -oP "\\\$wp_version\s*=\s*'\K[^']+" "$SITE_PATH/wp-includes/version.php" 2>/dev/null || echo "")
     if [ -n "$wp_ver" ]; then
         [ "$JSON_OUTPUT" = false ] && info "Checking WordPress core $wp_ver..."
-        while IFS='|' read -r uuid name max_ver max_op unfixed cve cvss severity; do
+        while IFS='|' read -r uuid name max_ver max_op min_ver min_op unfixed cve cvss severity; do
             [ -z "$uuid" ] && continue
-            affected=$(is_affected "$wp_ver" "$max_ver" "$max_op" "$unfixed")
+            affected=$(is_affected "$wp_ver" "$max_ver" "$max_op" "$min_ver" "$min_op" "$unfixed")
             if [ "$affected" = "1" ]; then
                 TOTAL_VULNS=$((TOTAL_VULNS + 1))
                 sev_upper=$(echo "$severity" | tr '[:lower:]' '[:upper:]')
@@ -299,9 +335,9 @@ except:
         [ -z "$slug" ] && continue
         checked=$((checked + 1))
 
-        while IFS='|' read -r uuid name max_ver max_op unfixed cve cvss severity; do
+        while IFS='|' read -r uuid name max_ver max_op min_ver min_op unfixed cve cvss severity; do
             [ -z "$uuid" ] && continue
-            affected=$(is_affected "$version" "$max_ver" "$max_op" "$unfixed")
+            affected=$(is_affected "$version" "$max_ver" "$max_op" "$min_ver" "$min_op" "$unfixed")
             if [ "$affected" = "1" ]; then
                 TOTAL_VULNS=$((TOTAL_VULNS + 1))
                 sev_upper=$(echo "$severity" | tr '[:lower:]' '[:upper:]')
@@ -344,9 +380,9 @@ except:
     while IFS='|' read -r slug version status; do
         [ -z "$slug" ] && continue
 
-        while IFS='|' read -r uuid name max_ver max_op unfixed cve cvss severity; do
+        while IFS='|' read -r uuid name max_ver max_op min_ver min_op unfixed cve cvss severity; do
             [ -z "$uuid" ] && continue
-            affected=$(is_affected "$version" "$max_ver" "$max_op" "$unfixed")
+            affected=$(is_affected "$version" "$max_ver" "$max_op" "$min_ver" "$min_op" "$unfixed")
             if [ "$affected" = "1" ]; then
                 TOTAL_VULNS=$((TOTAL_VULNS + 1))
                 sev_upper=$(echo "$severity" | tr '[:lower:]' '[:upper:]')
