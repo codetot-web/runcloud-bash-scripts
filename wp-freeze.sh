@@ -170,20 +170,35 @@ inject_wpconfig_constants() {
         python3 -c '
 import sys
 path = sys.argv[1]
-content = open(path).read()
-block = (
-    "\n// === CODE FREEZE \u2014 managed by wp-freeze.sh ===\n"
-    "define(\"DISALLOW_FILE_EDIT\", true);\n"
-    "define(\"DISALLOW_FILE_MODS\", true);\n"
-    "define(\"AUTOMATIC_UPDATER_DISABLED\", true);\n"
-    "// === END CODE FREEZE ===\n"
-)
-marker = "That\x27s all, stop editing"
-if marker in content:
-    content = content.replace(marker, block + marker, 1)
+lines = open(path).read().split("\n")
+block = [
+    "// === CODE FREEZE \u2014 managed by wp-freeze.sh ===",
+    "define(\"DISALLOW_FILE_EDIT\", true);",
+    "define(\"DISALLOW_FILE_MODS\", true);",
+    "define(\"AUTOMATIC_UPDATER_DISABLED\", true);",
+    "// === END CODE FREEZE ===",
+    "",
+    "// Force direct filesystem: frozen sites are read-only, so WP_Filesystem()",
+    "// would fall back to FTP and fatal on a null connection (Kirki webfonts).",
+    "define(\"FS_METHOD\", \"direct\");",
+    "",
+]
+# Insert BEFORE the whole line that starts the "stop editing" comment.
+# Inserting before the marker *text* lands inside the /* ... */ comment and
+# silently disables every constant (found on cttpiper.vn, Nov 2026).
+idx = None
+for i, l in enumerate(lines):
+    st = l.strip()
+    # Match the real end-of-config marker, not the "Add any custom values
+    # between this line and the stop editing line" hint above it.
+    if "Happy publishing" in st or ("That" in st and "stop editing" in st):
+        idx = i
+        break
+if idx is not None:
+    lines[idx:idx] = block
 else:
-    content = content.rstrip() + block
-open(path, "w").write(content)
+    lines = [l for l in lines if l.strip()] + [""] + block
+open(path, "w").write("\n".join(lines))
 ' "$wpconfig"
         success "Injected CODE FREEZE constants into wp-config.php"
     fi
@@ -325,16 +340,31 @@ freeze_permissions() {
         return
     fi
 
-    # Core WordPress dirs and files (exclude uploads)
-    find "$site_path" \
-        -not \( -path "$site_path/wp-content/uploads" -prune \) \
-        -not \( -path "$site_path/wp-content/uploads/*" -prune \) \
-        -type d -exec chmod 555 {} +
+    # Directories that MUST stay writable at runtime even when frozen.
+    # Freezing these breaks the site: Kirki re-downloads webfonts on every
+    # request (500), NinjaFirewall cannot write logs/sessions, W3TC cannot
+    # write its config, and core/plugin updates cannot stage files.
+    local -a keep_writable=(
+        "wp-content/uploads"
+        "wp-content/fonts"
+        "wp-content/nfwlog"
+        "wp-content/cache"
+        "wp-content/upgrade"
+        "wp-content/upgrade-temp-backup"
+        "wp-content/updraft"
+        "wp-content/w3tc-config"
+        "wp-content/languages"
+    )
 
-    find "$site_path" \
-        -not \( -path "$site_path/wp-content/uploads" -prune \) \
-        -not \( -path "$site_path/wp-content/uploads/*" -prune \) \
-        -type f -exec chmod 444 {} +
+    local -a prune_args=()
+    for d in "${keep_writable[@]}"; do
+        prune_args+=( -not \( -path "$site_path/$d" -prune \) )
+        prune_args+=( -not \( -path "$site_path/$d/*" -prune \) )
+    done
+
+    # Core WordPress dirs and files (exclude runtime-writable dirs)
+    find "$site_path" "${prune_args[@]}" -type d -exec chmod 555 {} +
+    find "$site_path" "${prune_args[@]}" -type f -exec chmod 444 {} +
 
     # wp-config.php: owner+group read only, no others
     [ -f "$site_path/wp-config.php" ] && chmod 440 "$site_path/wp-config.php"
